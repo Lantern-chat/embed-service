@@ -30,6 +30,7 @@ bitflags::bitflags! {
 
 serde_shims::impl_serde_for_bitflags!(EmbedFlags);
 common::impl_schema_for_bitflags!(EmbedFlags);
+common::impl_sql_for_bitflags!(EmbedFlags);
 
 fn is_none_or_empty(value: &Option<SmolStr>) -> bool {
     match value {
