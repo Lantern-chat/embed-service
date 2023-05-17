@@ -1,0 +1,5 @@
+[workspace]
+members = ["embed-sdk"]
+
+[patch.crates-io]
+smol_str = { git = "https://github.com/novacrazy/smol_str" }
