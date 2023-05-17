@@ -20,7 +20,12 @@ impl Extractor for DeviantArtExtractor {
         }
     }
 
-    async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
+    async fn extract(
+        &self,
+        state: Arc<ServiceState>,
+        url: Url,
+        params: Params,
+    ) -> Result<EmbedWithExpire, Error> {
         let canonical_url = {
             let mut origin = url.origin().ascii_serialization();
             origin += url.path();
@@ -61,8 +66,10 @@ impl Extractor for DeviantArtExtractor {
         embed.obj = None;
 
         // oEmbed provides name/url
-        embed.provider.icon =
-            Some(BoxedEmbedMedia::default().with_url("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico"));
+        embed.provider.icon = Some(
+            BoxedEmbedMedia::default()
+                .with_url("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico"),
+        );
 
         // thumbnails are often unnecessary for DA
         if embed.has_fullsize_media() {
@@ -73,7 +80,11 @@ impl Extractor for DeviantArtExtractor {
         embed.url = Some(canonical_url.into());
 
         // 4-hour expire
-        Ok(generic::finalize_embed(state, embed, max_age.or(Some(60 * 60 * 4))))
+        Ok(generic::finalize_embed(
+            state,
+            embed,
+            max_age.or(Some(60 * 60 * 4)),
+        ))
     }
 }
 

@@ -22,14 +22,22 @@ impl ExtractorFactory for WikipediaExtractorFactory {
             if let Some(max_sentences) = extractor.get("max_sentences") {
                 match max_sentences.parse() {
                     Ok(max_sentences) => wiki.max_sentences = max_sentences,
-                    Err(_) => return Err(ConfigError::InvalidExtractorField("wikipedia.max_sentences")),
+                    Err(_) => {
+                        return Err(ConfigError::InvalidExtractorField(
+                            "wikipedia.max_sentences",
+                        ))
+                    }
                 }
             }
 
             if let Some(thumbnail_size) = extractor.get("thumbnail_size") {
                 match thumbnail_size.parse() {
                     Ok(thumbnail_size) => wiki.thumbnail_size = thumbnail_size,
-                    Err(_) => return Err(ConfigError::InvalidExtractorField("wikipedia.thumbnail_size")),
+                    Err(_) => {
+                        return Err(ConfigError::InvalidExtractorField(
+                            "wikipedia.thumbnail_size",
+                        ))
+                    }
                 }
             }
         };
@@ -45,7 +53,12 @@ impl Extractor for WikipediaExtractor {
             && url.path().starts_with("/wiki/")
     }
 
-    async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
+    async fn extract(
+        &self,
+        state: Arc<ServiceState>,
+        url: Url,
+        params: Params,
+    ) -> Result<EmbedWithExpire, Error> {
         let Some(title) = url.path_segments().and_then(|mut s| s.nth(1)) else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
@@ -76,7 +89,11 @@ impl Extractor for WikipediaExtractor {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         }
 
-        if let Some(ImagePage::Found { thumbnail, pageimage }) = image.query.pages.values().next() {
+        if let Some(ImagePage::Found {
+            thumbnail,
+            pageimage,
+        }) = image.query.pages.values().next()
+        {
             let mut media = BoxedEmbedMedia::default().with_url(&thumbnail.source);
 
             media.width = thumbnail.width;
@@ -90,8 +107,9 @@ impl Extractor for WikipediaExtractor {
 
         embed.provider.name = Some(SmolStr::new_inline("Wikipedia"));
         embed.provider.icon = Some(
-            BoxedEmbedMedia::default()
-                .with_url(smol_str::format_smolstr!("{origin}/static/favicon/wikipedia.ico")),
+            BoxedEmbedMedia::default().with_url(smol_str::format_smolstr!(
+                "{origin}/static/favicon/wikipedia.ico"
+            )),
         );
 
         // 4-hour expire
@@ -129,7 +147,10 @@ pub enum TextPage {
 #[derive(Debug, serde::Deserialize)]
 #[serde(untagged)]
 pub enum ImagePage {
-    Found { thumbnail: Thumbnail, pageimage: String },
+    Found {
+        thumbnail: Thumbnail,
+        pageimage: String,
+    },
     NotFound {},
 }
 

@@ -471,7 +471,9 @@ pub struct EmbedProvider {
 
 impl EmbedProvider {
     pub fn is_none(&self) -> bool {
-        is_none_or_empty(&self.name) && is_none_or_empty(&self.url) && EmbedMedia::is_empty(&self.icon)
+        is_none_or_empty(&self.name)
+            && is_none_or_empty(&self.url)
+            && EmbedMedia::is_empty(&self.icon)
     }
 }
 
@@ -479,7 +481,9 @@ impl EmbedAuthor {
     pub fn is_none(this: &Option<Self>) -> bool {
         match this {
             Some(ref this) => {
-                this.name.is_empty() && is_none_or_empty(&this.url) && EmbedMedia::is_empty(&this.icon)
+                this.name.is_empty()
+                    && is_none_or_empty(&this.url)
+                    && EmbedMedia::is_empty(&this.icon)
             }
             None => true,
         }
@@ -539,7 +543,12 @@ pub struct EmbedField {
     pub img: Option<BoxedEmbedMedia>,
 
     /// Should use block-formatting
-    #[serde(rename = "b", alias = "block", default, skip_serializing_if = "is_false")]
+    #[serde(
+        rename = "b",
+        alias = "block",
+        default,
+        skip_serializing_if = "is_false"
+    )]
     #[cfg_attr(feature = "typed-builder", builder(default))]
     pub block: bool,
 }

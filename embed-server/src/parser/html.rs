@@ -216,7 +216,9 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                                 link.sizes = Some({
                                     let mut sizes = [0; 2];
 
-                                    for dim in value.split('x').take(2).map(|d| d.parse()).enumerate() {
+                                    for dim in
+                                        value.split('x').take(2).map(|d| d.parse()).enumerate()
+                                    {
                                         if let (idx, Ok(value)) = dim {
                                             sizes[idx] = value;
                                         }

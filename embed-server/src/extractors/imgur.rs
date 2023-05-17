@@ -46,7 +46,9 @@ impl Extractor for ImgurExtractor {
                 Some(potential_image_id) => potential_image_id,
                 None => return false,
             },
-            Some(potential_image_id) if !BAD_PATHS.contains(&potential_image_id) => potential_image_id,
+            Some(potential_image_id) if !BAD_PATHS.contains(&potential_image_id) => {
+                potential_image_id
+            }
             _ => return false,
         };
 
@@ -55,10 +57,17 @@ impl Extractor for ImgurExtractor {
             return false;
         };
 
-        potential_image_id.chars().all(|c| c.is_ascii_alphanumeric())
+        potential_image_id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric())
     }
 
-    async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
+    async fn extract(
+        &self,
+        state: Arc<ServiceState>,
+        url: Url,
+        params: Params,
+    ) -> Result<EmbedWithExpire, Error> {
         let Some(mut segments) = url.path_segments() else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
@@ -144,7 +153,8 @@ impl Extractor for ImgurExtractor {
 
             provider.name = Some(SmolStr::new_inline("imgur"));
             provider.url = Some(SmolStr::new_inline("https://imgur.com"));
-            provider.icon = Some(BoxedEmbedMedia::default().with_url("https://s.imgur.com/images/favicon.png"));
+            provider.icon =
+                Some(BoxedEmbedMedia::default().with_url("https://s.imgur.com/images/favicon.png"));
 
             provider
         });

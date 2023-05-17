@@ -5,26 +5,26 @@ pub type Hmac = hmac::SimpleHmac<sha1::Sha1>;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
-pub struct WorkerState {
+pub struct ServiceState {
     pub config: Config,
-    pub signing_key: Key<Hmac>,
+    pub signing_key: Option<Key<Hmac>>,
     pub client: reqwest::Client,
     pub extractors: Vec<Box<dyn Extractor>>,
 }
 
 use common::fixed::FixedStr;
 
-impl WorkerState {
-    pub fn new(config: Config, signing_key: String) -> Self {
-        WorkerState {
-            signing_key: {
+impl ServiceState {
+    pub fn new(config: Config, signing_key: Option<String>) -> Self {
+        ServiceState {
+            signing_key: signing_key.map(|signing_key: String| {
                 let mut raw_key = Key::<Hmac>::default();
                 // keys are allowed to be shorter than the entire raw key. Will be padded internally.
                 hex::decode_to_slice(&signing_key, &mut raw_key[..signing_key.len() / 2])
                     .expect("Could not parse signing key!");
 
                 raw_key
-            },
+            }),
             client: {
                 reqwest::ClientBuilder::new()
                     .default_headers({
@@ -59,7 +59,9 @@ impl WorkerState {
                 let mut extractors = Vec::new();
 
                 for factory in crate::extractors::extractor_factories() {
-                    if let Some(extractor) = factory.create(&config).expect("Could not create extractor") {
+                    if let Some(extractor) =
+                        factory.create(&config).expect("Could not create extractor")
+                    {
                         extractors.push(extractor);
                     }
                 }
@@ -71,16 +73,19 @@ impl WorkerState {
     }
 
     pub fn sign(&self, value: &str) -> Option<FixedStr<27>> {
+        let Some(ref key) = self.signing_key else {
+            return None;
+        };
+
         use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
 
-        let sig = Hmac::new(&self.signing_key)
-            .chain_update(value)
-            .finalize()
-            .into_bytes();
+        let sig = Hmac::new(key).chain_update(value).finalize().into_bytes();
 
         let mut buf = [0; 27];
         if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
-            return Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
+            return Some(FixedStr::new(unsafe {
+                std::str::from_utf8_unchecked(&buf)
+            }));
         }
 
         None

@@ -17,7 +17,7 @@ impl Extractor for GenericExtractor {
 
     async fn extract(
         &self,
-        state: Arc<WorkerState>,
+        state: Arc<ServiceState>,
         url: url::Url,
         params: Params,
     ) -> Result<EmbedWithExpire, Error> {
@@ -25,7 +25,9 @@ impl Extractor for GenericExtractor {
             return Err(Error::InvalidUrl);
         }
 
-        let site = url.domain().and_then(|domain| state.config.find_site(domain));
+        let site = url
+            .domain()
+            .and_then(|domain| state.config.find_site(domain));
 
         let mut resp = retry_request(2, || {
             let mut req = state.client.get(url.as_str());
@@ -75,7 +77,11 @@ impl Extractor for GenericExtractor {
 
         drop(links);
 
-        if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
+        if let Some(mime) = resp
+            .headers()
+            .get("content-type")
+            .and_then(|h| h.to_str().ok())
+        {
             let Some(mime) = mime.split(';').next() else {
             return Err(Error::InvalidMimeType);
         };
@@ -164,7 +170,11 @@ impl Extractor for GenericExtractor {
     }
 }
 
-pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: Option<u64>) -> EmbedWithExpire {
+pub fn finalize_embed(
+    state: Arc<ServiceState>,
+    mut embed: EmbedV1,
+    max_age: Option<u64>,
+) -> EmbedWithExpire {
     crate::parser::quirks::fix_embed(&mut embed);
 
     embed.visit_media_mut(|media| {
@@ -180,7 +190,10 @@ pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: Opti
         embed
             .ts
             .checked_add(Duration::seconds(
-                max_age.unwrap_or(60 * 15).min(60 * 60 * 24 * 30).max(60 * 15) as i64,
+                max_age
+                    .unwrap_or(60 * 15)
+                    .min(60 * 60 * 24 * 30)
+                    .max(60 * 15) as i64,
             ))
             .unwrap()
     };
@@ -189,7 +202,7 @@ pub fn finalize_embed(state: Arc<WorkerState>, mut embed: EmbedV1, max_age: Opti
 }
 
 pub async fn fetch_oembed<'a>(
-    state: &WorkerState,
+    state: &ServiceState,
     link: &OEmbedLink<'a>,
     domain: Option<&str>,
 ) -> Result<Option<OEmbed>, Error> {
@@ -251,7 +264,7 @@ pub async fn read_bytes<'a>(
 }
 
 pub async fn resolve_images(
-    state: &WorkerState,
+    state: &ServiceState,
     site: &Option<Arc<Site>>,
     embed: &mut EmbedV1,
 ) -> Result<(), Error> {
@@ -295,7 +308,10 @@ pub async fn resolve_images(
     Ok(())
 }
 
-pub async fn retry_request<F>(max_attempts: u8, mut make_request: F) -> Result<reqwest::Response, Error>
+pub async fn retry_request<F>(
+    max_attempts: u8,
+    mut make_request: F,
+) -> Result<reqwest::Response, Error>
 where
     F: FnMut() -> reqwest::RequestBuilder,
 {
@@ -315,7 +331,7 @@ where
 }
 
 pub async fn resolve_media(
-    state: &WorkerState,
+    state: &ServiceState,
     site: &Option<Arc<Site>>,
     media: &mut EmbedMedia,
     head: bool,
@@ -343,7 +359,11 @@ pub async fn resolve_media(
     })
     .await?;
 
-    if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
+    if let Some(mime) = resp
+        .headers()
+        .get("content-type")
+        .and_then(|h| h.to_str().ok())
+    {
         media.mime = Some(mime.into());
 
         if !head && mime.starts_with("image") {

@@ -57,7 +57,7 @@ impl Extractor for InkbunnyExtractor {
         matches!(url.domain(), Some("inkbunny.net")) && url.path().starts_with("/s/")
     }
 
-    async fn setup(&self, state: Arc<WorkerState>) -> Result<(), Error> {
+    async fn setup(&self, state: Arc<ServiceState>) -> Result<(), Error> {
         if self.session_id.load().is_some() {
             return Ok(());
         }
@@ -90,7 +90,12 @@ impl Extractor for InkbunnyExtractor {
         Ok(())
     }
 
-    async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
+    async fn extract(
+        &self,
+        state: Arc<ServiceState>,
+        url: Url,
+        params: Params,
+    ) -> Result<EmbedWithExpire, Error> {
         let Some(image_id) = url.path_segments().unwrap().nth(1) else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
@@ -192,8 +197,9 @@ impl Extractor for InkbunnyExtractor {
         embed.color = Some(0x73d216);
         embed.provider.name = Some(SmolStr::new_inline("Inkbunny"));
         embed.provider.url = Some(SmolStr::new_inline("https://inkbunny.net"));
-        embed.provider.icon =
-            Some(BoxedEmbedMedia::default().with_url("https://va.ib.metapix.net/images80/favicon.ico"));
+        embed.provider.icon = Some(
+            BoxedEmbedMedia::default().with_url("https://va.ib.metapix.net/images80/favicon.ico"),
+        );
 
         embed.author = Some({
             let mut author = EmbedAuthor::default();
@@ -202,7 +208,10 @@ impl Extractor for InkbunnyExtractor {
             }
 
             author.name = submission.username;
-            author.url = Some(smol_str::format_smolstr!("https://inkbunny.net/{}", author.name));
+            author.url = Some(smol_str::format_smolstr!(
+                "https://inkbunny.net/{}",
+                author.name
+            ));
 
             author
         });
@@ -239,7 +248,9 @@ pub enum InkbunnyLoginResult {
 #[derive(Debug, serde::Deserialize)]
 #[serde(untagged)]
 pub enum InkbunnyResult {
-    Success { submissions: [InkbunnySubmission; 1] },
+    Success {
+        submissions: [InkbunnySubmission; 1],
+    },
     Error {},
 }
 

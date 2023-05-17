@@ -37,7 +37,7 @@ impl Extractor for E621Extractor {
 
     async fn extract(
         &self,
-        state: Arc<WorkerState>,
+        state: Arc<ServiceState>,
         url: Url,
         params: Params,
     ) -> Result<EmbedWithExpire, Error> {
@@ -87,7 +87,7 @@ use models::*;
 #[allow(clippy::field_reassign_with_default)]
 async fn fetch_single_id(
     extractor: &E621Extractor,
-    state: Arc<WorkerState>,
+    state: Arc<ServiceState>,
     url: &Url,
     id: &str,
     which: Which,
@@ -254,7 +254,8 @@ static E621_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e621"));
     provider.url = Some(SmolStr::new_inline("https://e621.net"));
-    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e621.net/apple-touch-icon.png"));
+    provider.icon =
+        Some(BoxedEmbedMedia::default().with_url("https://e621.net/apple-touch-icon.png"));
     provider
 });
 
@@ -262,6 +263,7 @@ static E926_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e926"));
     provider.url = Some(SmolStr::new_inline("https://e926.net"));
-    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e926.net/apple-touch-icon.png"));
+    provider.icon =
+        Some(BoxedEmbedMedia::default().with_url("https://e926.net/apple-touch-icon.png"));
     provider
 });

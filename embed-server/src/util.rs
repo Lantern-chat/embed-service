@@ -3,7 +3,10 @@ use std::{
     fmt::{self, Write},
 };
 
-pub fn format_list<I, T>(mut out: impl Write, list: impl IntoIterator<IntoIter = I>) -> Result<(), fmt::Error>
+pub fn format_list<I, T>(
+    mut out: impl Write,
+    list: impl IntoIterator<IntoIter = I>,
+) -> Result<(), fmt::Error>
 where
     I: Iterator<Item = T>,
     T: fmt::Display,

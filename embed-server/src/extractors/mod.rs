@@ -2,7 +2,7 @@
 
 use crate::{
     config::{Config, ConfigError},
-    Error, Params, WorkerState,
+    Error, Params, ServiceState,
 };
 use std::sync::Arc;
 
@@ -20,13 +20,13 @@ pub trait Extractor: Send + Sync + std::fmt::Debug {
     fn matches(&self, url: &Url) -> bool;
 
     /// Optional setup stage for extractor initialization on program start (i.e. login to services)
-    async fn setup(&self, _state: Arc<WorkerState>) -> Result<(), Error> {
+    async fn setup(&self, _state: Arc<ServiceState>) -> Result<(), Error> {
         Ok(())
     }
 
     async fn extract(
         &self,
-        state: Arc<WorkerState>,
+        state: Arc<ServiceState>,
         url: Url,
         params: Params,
     ) -> Result<EmbedWithExpire, Error>;
@@ -50,7 +50,7 @@ mod prelude {
 
     pub(crate) use crate::{
         config::{Config, ConfigError},
-        Error, Params, Site, WorkerState,
+        Error, Params, ServiceState, Site,
     };
 
     pub use super::{generic, EmbedWithExpire, Extractor, ExtractorFactory};

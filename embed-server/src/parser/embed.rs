@@ -117,7 +117,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "description" | "og:description" | "twitter:description" => {
                         embed.description = Some(crate::util::trim_text(&meta.content).into());
                     }
-                    "theme-color" | "msapplication-TileColor" => embed.color = parse_color(&meta.content),
+                    "theme-color" | "msapplication-TileColor" => {
+                        embed.color = parse_color(&meta.content)
+                    }
                     "og:site_name" => embed.provider.name = content(),
                     // TODO: This isn't quite correct, but good enough most of the time
                     "og:url" => embed.canonical = content(),
@@ -136,7 +138,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     {
                         get!(author).url = content();
                     }
-                    "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
+                    "dc:creator" | "article:author" | "book:author" => {
+                        get!(author).name = raw_content()
+                    }
 
                     // don't let the twitter image overwrite og images
                     "twitter:image" => match embed.img {
@@ -145,9 +149,15 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         _ => {}
                     },
 
-                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content(),
-                    "og:video" | "og:video:url" | "og:video:secure_url" => get!(video).url = raw_content(),
-                    "og:audio" | "og:audio:url" | "og:audio:secure_url" => get!(audio).url = raw_content(),
+                    "og:image" | "og:image:url" | "og:image:secure_url" => {
+                        get!(img).url = raw_content()
+                    }
+                    "og:video" | "og:video:url" | "og:video:secure_url" => {
+                        get!(video).url = raw_content()
+                    }
+                    "og:audio" | "og:audio:url" | "og:audio:secure_url" => {
+                        get!(audio).url = raw_content()
+                    }
 
                     "og:image:width" => get!(img).width = content_int(),
                     "og:video:width" => get!(video).width = content_int(),
@@ -179,7 +189,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         misc[idx as usize - 1].data = Some(&meta.content);
                     }
 
-                    _ if meta.property.eq_ignore_ascii_case("rating") => parse_rating(embed, &meta.content),
+                    _ if meta.property.eq_ignore_ascii_case("rating") => {
+                        parse_rating(embed, &meta.content)
+                    }
 
                     "isFamilyFriendly" => {
                         if meta.content != "true" {
@@ -260,7 +272,11 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         extra.link = Some(OEmbedLink {
                             url: link.href.clone(),
                             title: link.title.clone(),
-                            format: if ty.contains("xml") { OEmbedFormat::XML } else { OEmbedFormat::JSON },
+                            format: if ty.contains("xml") {
+                                OEmbedFormat::XML
+                            } else {
+                                OEmbedFormat::JSON
+                            },
                         });
                     }
                 }
@@ -372,7 +388,9 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, mut o: OEmbed) -> ExtraFields 
             _ => {
                 if let Some(src) = parse_embed_html_src(&html) {
                     media.url = src;
-                    mime = Some(parse_embed_html_type(&html).unwrap_or(SmolStr::new_inline("text/html")));
+                    mime = Some(
+                        parse_embed_html_type(&html).unwrap_or(SmolStr::new_inline("text/html")),
+                    );
                     overwrite = true;
                 }
             }

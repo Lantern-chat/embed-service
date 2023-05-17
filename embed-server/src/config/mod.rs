@@ -36,6 +36,9 @@ pub struct ParsedConfig {
     #[serde(default = "defaults::default_timeout")]
     pub timeout: u64,
 
+    #[serde(default = "defaults::default_signed")]
+    pub signed: bool,
+
     #[serde(default = "defaults::default_resolve_media")]
     pub resolve_media: bool,
 
@@ -63,6 +66,7 @@ mod defaults {
     pub const fn default_redirects() -> u32 { 2 }
     pub const fn default_timeout() -> u64 { 4000 }
     pub const fn default_resolve_media() -> bool { true }
+    pub const fn default_signed() -> bool { true }
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize)]
@@ -88,7 +92,11 @@ impl Site {
         }
     }
 
-    pub fn add_headers(&self, config: &Config, mut req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
+    pub fn add_headers(
+        &self,
+        config: &Config,
+        mut req: reqwest::RequestBuilder,
+    ) -> reqwest::RequestBuilder {
         if let Some(ref ua) = self.user_agent {
             if let Some(user_agent) = config.parsed.user_agents.get(ua) {
                 println!("Using {user_agent:?} for User Agent");
@@ -228,6 +236,10 @@ impl Config {
     pub fn find_site(&self, domain: &str) -> Option<Arc<Site>> {
         let domain = self.clean_domain(domain);
 
-        self.parsed.sites.values().find(|&site| site.matches(domain)).cloned()
+        self.parsed
+            .sites
+            .values()
+            .find(|&site| site.matches(domain))
+            .cloned()
     }
 }

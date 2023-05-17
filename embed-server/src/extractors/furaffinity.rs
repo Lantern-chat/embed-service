@@ -52,10 +52,18 @@ pub struct FurAffinityExtractor {
 #[async_trait::async_trait]
 impl Extractor for FurAffinityExtractor {
     fn matches(&self, url: &Url) -> bool {
-        matches!(url.domain(), Some("furaffinity.net" | "www.furaffinity.net")) && url.path().starts_with("/view/")
+        matches!(
+            url.domain(),
+            Some("furaffinity.net" | "www.furaffinity.net")
+        ) && url.path().starts_with("/view/")
     }
 
-    async fn extract(&self, state: Arc<WorkerState>, url: Url, params: Params) -> Result<EmbedWithExpire, Error> {
+    async fn extract(
+        &self,
+        state: Arc<ServiceState>,
+        url: Url,
+        params: Params,
+    ) -> Result<EmbedWithExpire, Error> {
         let html = state
             .client
             .get(url.clone())
@@ -130,7 +138,9 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
         match src {
             Some(src) if kind != Kind::Unsupported => {
-                let use_thumbnail = node.value().has_class("submission-writing", AsciiCaseInsensitive);
+                let use_thumbnail = node
+                    .value()
+                    .has_class("submission-writing", AsciiCaseInsensitive);
 
                 let mut media = BoxedEmbedMedia::default().with_url(fix_relative_scheme(src));
 
@@ -161,7 +171,9 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
                     "img" => match el.attr("alt") {
                         Some(alt_text) => {
                             // in some cases, there can be duplicate text of the alt name right next to the img element
-                            if let Some(text) = node.next_sibling().and_then(|s| s.value().as_text()) {
+                            if let Some(text) =
+                                node.next_sibling().and_then(|s| s.value().as_text())
+                            {
                                 if alt_text == text.trim() {
                                     continue;
                                 }
@@ -228,8 +240,10 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
         provider.name = Some(SmolStr::new_inline("FurAffinity"));
         provider.url = Some(SmolStr::new("https://www.furaffinity.net"));
-        provider.icon =
-            Some(BoxedEmbedMedia::default().with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"));
+        provider.icon = Some(
+            BoxedEmbedMedia::default()
+                .with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"),
+        );
 
         provider
     });

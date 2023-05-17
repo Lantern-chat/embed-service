@@ -2,6 +2,7 @@
 max_redirects = 2
 timeout = 4000       # milliseconds
 resolve_media = true
+signed = false
 
 # prefixes to strip from domains before testing
 prefixes = ["www.", "www2."]
