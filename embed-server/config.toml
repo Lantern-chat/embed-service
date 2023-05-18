@@ -4,6 +4,8 @@ timeout = 4000       # milliseconds
 resolve_media = true
 signed = false
 
+limits = { max_xml = 2097152 } # Example setting to 2MiB
+
 # prefixes to strip from domains before testing
 prefixes = ["www.", "www2."]
 

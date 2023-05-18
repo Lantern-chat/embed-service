@@ -53,6 +53,8 @@ impl Extractor for GenericExtractor {
 
         let mut embed = EmbedV1::default();
         let mut oembed: Option<OEmbed> = None;
+
+        // seconds until embed expires
         let mut max_age = None;
 
         if let Some(rating) = resp.headers().get(HeaderName::from_static("rating")) {
@@ -83,12 +85,14 @@ impl Extractor for GenericExtractor {
             .and_then(|h| h.to_str().ok())
         {
             let Some(mime) = mime.split(';').next() else {
-            return Err(Error::InvalidMimeType);
-        };
+                return Err(Error::InvalidMimeType);
+            };
 
             if mime == "text/html" {
-                let mut html = Vec::with_capacity(512);
-                if let Some(headers) = read_head(&mut resp, &mut html).await? {
+                let max = state.config.parsed.limits.max_html_size;
+                let mut html = Vec::with_capacity(max.min(512));
+
+                if let Some(headers) = read_head(&mut resp, &mut html, max).await? {
                     let extra = crate::parser::embed::parse_meta_to_embed(&mut embed, &headers);
 
                     match extra.link {
@@ -104,6 +108,23 @@ impl Extractor for GenericExtractor {
                 }
 
                 drop(html); // ensure it lives long enough
+            } else if matches!(
+                mime,
+                "application/rss+xml"
+                    | "application/feed+json"
+                    | "application/atom+xml"
+                    | "application/xml"
+            ) {
+                let max = state.config.parsed.limits.max_xml_size;
+                let mut body = Vec::with_capacity(max.min(512));
+
+                if let Ok(_) = read_bytes(&mut resp, &mut body, max).await {
+                    if let Ok(feed) = feed_rs::parser::parse_with_uri(&*body, Some(url.as_str())) {
+                        max_age = Some(crate::parser::feed::feed_into_embed(&mut embed, feed));
+                    }
+                }
+
+                drop(body);
             } else {
                 let mut media = BoxedEmbedMedia::default();
                 media.url = url.as_str().into();
@@ -111,9 +132,10 @@ impl Extractor for GenericExtractor {
 
                 match mime.get(0..5) {
                     Some("image") => {
-                        let mut bytes = Vec::with_capacity(512);
+                        let max = state.config.parsed.limits.max_media_size;
+                        let mut bytes = Vec::with_capacity(max.min(512));
 
-                        if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 1024).await {
+                        if let Ok(_) = read_bytes(&mut resp, &mut bytes, max).await {
                             if let Ok(image_size) = imagesize::blob_size(&bytes) {
                                 media.width = Some(image_size.width as _);
                                 media.height = Some(image_size.height as _);
@@ -223,6 +245,7 @@ pub async fn fetch_oembed<'a>(
 pub async fn read_head<'a>(
     resp: &'a mut reqwest::Response,
     html: &'a mut Vec<u8>,
+    max: usize,
 ) -> Result<Option<crate::parser::html::HeaderList<'a>>, Error> {
     while let Some(chunk) = resp.chunk().await? {
         html.extend(&chunk);
@@ -231,8 +254,8 @@ pub async fn read_head<'a>(
             break;
         }
 
-        // 1MB of HTML downloaded, assume it's a broken page or DoS attack and don't bother with more
-        if html.len() > (1024 * 1024) {
+        // Limits of HTML downloaded, assume it's a broken page or DoS attack and don't bother with more
+        if html.len() > max {
             break;
         }
     }
@@ -367,9 +390,11 @@ pub async fn resolve_media(
         media.mime = Some(mime.into());
 
         if !head && mime.starts_with("image") {
-            let mut bytes = Vec::with_capacity(512);
+            // half the max
+            let max = state.config.parsed.limits.max_media_size / 2;
+            let mut bytes = Vec::with_capacity(max.min(512));
 
-            if let Ok(_) = read_bytes(&mut resp, &mut bytes, 1024 * 512).await {
+            if let Ok(_) = read_bytes(&mut resp, &mut bytes, max).await {
                 if let Ok(image_size) = imagesize::blob_size(&bytes) {
                     media.width = Some(image_size.width as _);
                     media.height = Some(image_size.height as _);

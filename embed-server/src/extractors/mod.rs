@@ -56,6 +56,7 @@ mod prelude {
     pub use super::{generic, EmbedWithExpire, Extractor, ExtractorFactory};
 }
 
+pub mod feed;
 pub mod generic;
 
 pub mod deviantart;

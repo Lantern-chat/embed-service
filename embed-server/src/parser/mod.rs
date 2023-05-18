@@ -1,4 +1,5 @@
 pub mod embed;
+pub mod feed;
 pub mod html;
 pub mod oembed;
 pub mod quirks;

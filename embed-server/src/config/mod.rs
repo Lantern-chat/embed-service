@@ -27,6 +27,24 @@ pub enum ConfigError {
     InvalidExtractorField(&'static str),
 }
 
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
+#[serde(default)]
+pub struct Limits {
+    pub max_html_size: usize,
+    pub max_xml_size: usize,
+    pub max_media_size: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            max_html_size: 1024 * 1024,
+            max_xml_size: 1024 * 1024,
+            max_media_size: 1024 * 1024,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct ParsedConfig {
     #[serde(default = "defaults::default_redirects")]
@@ -53,6 +71,9 @@ pub struct ParsedConfig {
 
     #[serde(default)]
     pub sites: HashMap<String, Arc<Site>>,
+
+    #[serde(default)]
+    pub limits: Limits,
 
     #[serde(default)]
     pub user_agents: HashMap<String, DeHeaderValue>,
