@@ -16,6 +16,7 @@ pub use thin_vec::ThinVec as MaybeThinVec;
 pub type MaybeThinVec<T> = alloc::vec::Vec<T>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[serde(tag = "v")]
 pub enum Embed {
