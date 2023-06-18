@@ -62,6 +62,7 @@ impl Extractor for ImgurExtractor {
             .all(|c| c.is_ascii_alphanumeric())
     }
 
+    #[instrument(skip_all)]
     async fn extract(
         &self,
         state: Arc<ServiceState>,

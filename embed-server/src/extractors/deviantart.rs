@@ -20,6 +20,7 @@ impl Extractor for DeviantArtExtractor {
         }
     }
 
+    #[instrument(skip_all)]
     async fn extract(
         &self,
         state: Arc<ServiceState>,

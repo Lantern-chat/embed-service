@@ -35,6 +35,7 @@ impl Extractor for E621Extractor {
         matches!(url.domain(), Some("e621.net" | "e926.net")) && url.path().starts_with("/posts/")
     }
 
+    #[instrument(skip_all)]
     async fn extract(
         &self,
         state: Arc<ServiceState>,
@@ -85,6 +86,7 @@ pub mod models;
 use models::*;
 
 #[allow(clippy::field_reassign_with_default)]
+#[instrument(skip(extractor, state))]
 async fn fetch_single_id(
     extractor: &E621Extractor,
     state: Arc<ServiceState>,

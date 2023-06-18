@@ -53,6 +53,7 @@ impl Extractor for WikipediaExtractor {
             && url.path().starts_with("/wiki/")
     }
 
+    #[instrument(skip_all)]
     async fn extract(
         &self,
         state: Arc<ServiceState>,
