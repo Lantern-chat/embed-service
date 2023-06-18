@@ -9,6 +9,9 @@
 #[macro_use]
 extern crate serde;
 
+#[macro_use]
+extern crate tracing;
+
 pub mod config;
 pub mod error;
 pub mod extractors;
@@ -28,10 +31,17 @@ use axum::{
 };
 use futures_util::FutureExt;
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use tower_http::trace::TraceLayer;
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().expect("Unable to use .env");
+    tracing_subscriber::fmt::init();
+    if let Err(error) = dotenv::dotenv() {
+        warn!(
+            ?error,
+            "Couldn't read .env file. Continuing execution anyway"
+        );
+    }
 
     let config = {
         let config_path =
@@ -62,15 +72,20 @@ async fn main() {
     )
     .expect("Unable to parse bind address");
 
-    println!("Starting...");
+    info!(%addr, "Starting...");
 
     axum::Server::bind(&addr)
-        .serve(post(root).with_state(state).into_make_service())
+        .serve(
+            post(root)
+                .with_state(state)
+                .layer(TraceLayer::new_for_http())
+                .into_make_service(),
+        )
         .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
         .await
         .expect("Unable to run embed-worker");
 
-    println!("Goodbye.");
+    info!("Goodbye.");
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -79,6 +94,7 @@ pub struct Params {
     pub lang: Option<String>,
 }
 
+#[instrument(skip(state))]
 async fn root(
     State(state): State<Arc<ServiceState>>,
     Query(params): Query<Params>,

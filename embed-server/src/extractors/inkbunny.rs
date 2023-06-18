@@ -90,6 +90,7 @@ impl Extractor for InkbunnyExtractor {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn extract(
         &self,
         state: Arc<ServiceState>,

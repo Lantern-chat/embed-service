@@ -58,6 +58,7 @@ impl Extractor for FurAffinityExtractor {
         ) && url.path().starts_with("/view/")
     }
 
+    #[instrument(skip_all)]
     async fn extract(
         &self,
         state: Arc<ServiceState>,
@@ -100,6 +101,7 @@ fn accumulate_text(el: ElementRef) -> String {
     })
 }
 
+#[instrument(skip_all)]
 fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
     let doc = scraper::Html::parse_document(html);
 
