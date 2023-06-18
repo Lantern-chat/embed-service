@@ -15,6 +15,11 @@ pub use thin_vec::ThinVec as MaybeThinVec;
 #[cfg(not(feature = "thin-vec"))]
 pub type MaybeThinVec<T> = alloc::vec::Vec<T>;
 
+/// Default type returned by the embed server
+///
+/// You probably want to deserialise the payloads with this type alias
+pub type EmbedWithExpire = (Timestamp, Embed);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
