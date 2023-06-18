@@ -31,7 +31,7 @@ use axum::{
 };
 use futures_util::FutureExt;
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use tower_http::trace::TraceLayer;
+use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 
 #[tokio::main]
 async fn main() {
@@ -77,6 +77,7 @@ async fn main() {
     axum::Server::bind(&addr)
         .serve(
             post(root)
+                .route_layer(CatchPanicLayer::new())
                 .with_state(state)
                 .layer(TraceLayer::new_for_http())
                 .into_make_service(),
