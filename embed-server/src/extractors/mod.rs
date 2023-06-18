@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use url::Url;
 
-pub type EmbedWithExpire = (iso8601_timestamp::Timestamp, embed::Embed);
+pub use embed::EmbedWithExpire;
 
 pub trait ExtractorFactory {
     fn create(&self, config: &Config) -> Result<Option<Box<dyn Extractor>>, ConfigError>;
