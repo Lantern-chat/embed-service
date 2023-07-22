@@ -1,7 +1,4 @@
-use std::env;
-use std::fs::File;
-use std::io::BufWriter;
-use std::path::Path;
+use std::{env, fs::File, io::BufWriter, path::Path};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let path = Path::new(&env::var("OUT_DIR")?).join("codegen.rs");
