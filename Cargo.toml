@@ -1,5 +1,6 @@
 [workspace]
 members = ["embed-sdk", "embed-server"]
+resolver = "2"
 
 [patch.crates-io]
 smol_str = { git = "https://github.com/novacrazy/smol_str" }
