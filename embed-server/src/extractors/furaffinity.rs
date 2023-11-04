@@ -29,7 +29,9 @@ impl ExtractorFactory for FurAffinityExtractorFactory {
         };
 
         let Some(ua) = config.parsed.user_agents.get("%browser") else {
-            return Err(ConfigError::InvalidUserAgent("%browser not found".to_owned()));
+            return Err(ConfigError::InvalidUserAgent(
+                "%browser not found".to_owned(),
+            ));
         };
 
         let Ok(cookie) = HeaderValue::try_from(format!("b={b}; a={a}")) else {
@@ -122,7 +124,9 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
         let mut kind = Kind::Unsupported;
 
         for e in node.traverse() {
-            let Edge::Open(node) = e else { continue; };
+            let Edge::Open(node) = e else {
+                continue;
+            };
             if let Node::Element(el) = node.value() {
                 kind = match el.name() {
                     "img" => Kind::Image,
@@ -165,7 +169,9 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
         let mut description = String::new();
 
         for e in node.traverse() {
-            let Edge::Open(node) = e else { continue; };
+            let Edge::Open(node) = e else {
+                continue;
+            };
             description += match node.value() {
                 Node::Text(t) => trim_nl(t).trim_start(),
                 Node::Element(el) => match el.name() {

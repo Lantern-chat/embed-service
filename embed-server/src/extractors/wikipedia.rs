@@ -83,7 +83,7 @@ impl Extractor for WikipediaExtractor {
 
         let mut embed = EmbedV1::default();
 
-        if let Some(TextPage::Found { title, extract }) = text.query.pages.get(0) {
+        if let Some(TextPage::Found { title, extract }) = text.query.pages.first() {
             embed.title = Some(title.clone());
             embed.description = Some(extract.into());
         } else {

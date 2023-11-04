@@ -113,7 +113,10 @@ impl Extractor for InkbunnyExtractor {
 
         let resp = state.client.get(api_uri).send().await?.json().await?;
 
-        let InkbunnyResult::Success { submissions: [mut submission] } = resp else {
+        let InkbunnyResult::Success {
+            submissions: [mut submission],
+        } = resp
+        else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
