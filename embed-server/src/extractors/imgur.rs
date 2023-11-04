@@ -96,7 +96,11 @@ impl Extractor for ImgurExtractor {
             .json()
             .await?;
 
-        let ImgurResult::Success { data: Some(mut data), .. } = resp else {
+        let ImgurResult::Success {
+            data: Some(mut data),
+            ..
+        } = resp
+        else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 

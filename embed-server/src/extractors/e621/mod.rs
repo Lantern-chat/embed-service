@@ -6,7 +6,12 @@ pub struct E621ExtractorFactory;
 
 impl ExtractorFactory for E621ExtractorFactory {
     fn create(&self, config: &Config) -> Result<Option<Box<dyn Extractor>>, ConfigError> {
-        let Some(extractor) = config.parsed.extractors.get("e621").or_else(|| config.parsed.extractors.get("e926")) else {
+        let Some(extractor) = config
+            .parsed
+            .extractors
+            .get("e621")
+            .or_else(|| config.parsed.extractors.get("e926"))
+        else {
             return Ok(None);
         };
 
@@ -198,7 +203,11 @@ async fn fetch_single_id(
             break 'vid_alt;
         };
 
-        let Some(Some(url)) = alt.urls.iter().find(|&url| matches!(url, Some(url) if !url.ends_with("webm"))) else {
+        let Some(Some(url)) = alt
+            .urls
+            .iter()
+            .find(|&url| matches!(url, Some(url) if !url.ends_with("webm")))
+        else {
             break 'vid_alt;
         };
 
