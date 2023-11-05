@@ -66,20 +66,12 @@ impl Extractor for InkbunnyExtractor {
             (Some(username), Some(password)) => {
                 println!("Logging into Inkbunny as {username}!");
 
-                format!(
-                    "https://inkbunny.net/api_login.php?output_mode=json&username={username}&password={password}"
-                )
+                format!("https://inkbunny.net/api_login.php?output_mode=json&username={username}&password={password}")
             }
             _ => return Err(Error::Failure(StatusCode::UNAUTHORIZED)),
         };
 
-        let resp = state
-            .client
-            .post(login_uri)
-            .send()
-            .await?
-            .json::<InkbunnyLoginResult>()
-            .await?;
+        let resp = state.client.post(login_uri).send().await?.json::<InkbunnyLoginResult>().await?;
 
         let InkbunnyLoginResult::Success { sid } = resp else {
             return Err(Error::Failure(StatusCode::UNAUTHORIZED));
@@ -108,12 +100,17 @@ impl Extractor for InkbunnyExtractor {
 
         let sid_guard = self.session_id.load();
         let sid = sid_guard.as_ref().unwrap();
-        let api_uri = format!("https://inkbunny.net/api_submissions.php?output_mode=json&show_description=yes&sid={sid}&submission_ids={image_id}");
+        let api_uri = format!(
+            "https://inkbunny.net/api_submissions.php?output_mode=json&show_description=yes&sid={sid}&submission_ids={image_id}"
+        );
         drop(sid_guard);
 
         let resp = state.client.get(api_uri).send().await?.json().await?;
 
-        let InkbunnyResult::Success { submissions: [mut submission] } = resp else {
+        let InkbunnyResult::Success {
+            submissions: [mut submission],
+        } = resp
+        else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
@@ -198,9 +195,8 @@ impl Extractor for InkbunnyExtractor {
         embed.color = Some(0x73d216);
         embed.provider.name = Some(SmolStr::new_inline("Inkbunny"));
         embed.provider.url = Some(SmolStr::new_inline("https://inkbunny.net"));
-        embed.provider.icon = Some(
-            BoxedEmbedMedia::default().with_url("https://va.ib.metapix.net/images80/favicon.ico"),
-        );
+        embed.provider.icon =
+            Some(BoxedEmbedMedia::default().with_url("https://va.ib.metapix.net/images80/favicon.ico"));
 
         embed.author = Some({
             let mut author = EmbedAuthor::default();
@@ -209,10 +205,7 @@ impl Extractor for InkbunnyExtractor {
             }
 
             author.name = submission.username;
-            author.url = Some(smol_str::format_smolstr!(
-                "https://inkbunny.net/{}",
-                author.name
-            ));
+            author.url = Some(smol_str::format_smolstr!("https://inkbunny.net/{}", author.name));
 
             author
         });
@@ -249,9 +242,7 @@ pub enum InkbunnyLoginResult {
 #[derive(Debug, serde::Deserialize)]
 #[serde(untagged)]
 pub enum InkbunnyResult {
-    Success {
-        submissions: [InkbunnySubmission; 1],
-    },
+    Success { submissions: [InkbunnySubmission; 1] },
     Error {},
 }
 

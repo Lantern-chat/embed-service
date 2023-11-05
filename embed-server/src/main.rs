@@ -37,15 +37,11 @@ use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
 async fn main() {
     tracing_subscriber::fmt::init();
     if let Err(error) = dotenv::dotenv() {
-        warn!(
-            ?error,
-            "Couldn't read .env file. Continuing execution anyway"
-        );
+        warn!(?error, "Couldn't read .env file. Continuing execution anyway");
     }
 
     let config = {
-        let config_path =
-            std::env::var("EMBEDW_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
+        let config_path = std::env::var("EMBEDW_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
         let config_file = std::fs::read_to_string(config_path).expect("Unable to read config file");
         let parsed: config::ParsedConfig =
             toml::de::from_str(&config_file).expect("Unable to parse config file");
@@ -53,24 +49,18 @@ async fn main() {
         parsed.build().expect("Unable to build config")
     };
 
-    let signing_key = config
-        .parsed
-        .signed
-        .then(|| std::env::var("CAMO_SIGNING_KEY").expect("CAMO_SIGNING_KEY not found"));
+    let signing_key =
+        config.parsed.signed.then(|| std::env::var("CAMO_SIGNING_KEY").expect("CAMO_SIGNING_KEY not found"));
 
     let state = Arc::new(ServiceState::new(config, signing_key));
 
     for extractor in &state.extractors {
-        extractor
-            .setup(state.clone())
-            .await
-            .expect("Failed to setup extractor");
+        extractor.setup(state.clone()).await.expect("Failed to setup extractor");
     }
 
-    let addr = SocketAddr::from_str(
-        &std::env::var("EMBEDS_BIND_ADDRESS").expect("EMBEDS_BIND_ADDRESS not found"),
-    )
-    .expect("Unable to parse bind address");
+    let addr =
+        SocketAddr::from_str(&std::env::var("EMBEDS_BIND_ADDRESS").expect("EMBEDS_BIND_ADDRESS not found"))
+            .expect("Unable to parse bind address");
 
     info!(%addr, "Starting...");
 
@@ -118,11 +108,7 @@ async fn root(
                 Error::JsonError(_) | Error::XMLError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             };
 
-            let msg = if code.is_server_error() {
-                "Internal Server Error".to_owned()
-            } else {
-                e.to_string()
-            };
+            let msg = if code.is_server_error() { "Internal Server Error".to_owned() } else { e.to_string() };
 
             (code, msg)
         }),

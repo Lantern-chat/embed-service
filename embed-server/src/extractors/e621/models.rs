@@ -120,18 +120,16 @@ impl Post {
 
         crate::util::format_list(
             &mut author,
-            std::iter::empty()
-                .chain(self.tags.artist.iter().take(4))
-                .chain(
-                    // if there are more than 4 artists listed, add "N more" to list
-                    match self.tags.artist.len().checked_sub(4) {
-                        Some(remaining) if remaining > 0 => {
-                            rest_storage = smol_str::format_smolstr!("{remaining} more");
-                            Some(&rest_storage)
-                        }
-                        _ => None,
-                    },
-                ),
+            std::iter::empty().chain(self.tags.artist.iter().take(4)).chain(
+                // if there are more than 4 artists listed, add "N more" to list
+                match self.tags.artist.len().checked_sub(4) {
+                    Some(remaining) if remaining > 0 => {
+                        rest_storage = smol_str::format_smolstr!("{remaining} more");
+                        Some(&rest_storage)
+                    }
+                    _ => None,
+                },
+            ),
         )?;
 
         Ok(Some(author.replace('_', " ")))
@@ -161,12 +159,7 @@ impl Post {
                 title += ". ";
             }
 
-            let list = self
-                .tags
-                .copyright
-                .iter()
-                .map(|c| heck::AsTitleCase(c.as_str()))
-                .take(4);
+            let list = self.tags.copyright.iter().map(|c| heck::AsTitleCase(c.as_str())).take(4);
 
             title += "(© ";
             crate::util::format_list(&mut title, list)?;

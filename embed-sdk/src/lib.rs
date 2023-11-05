@@ -9,11 +9,7 @@ pub use common::fixed::FixedStr;
 pub use smol_str::SmolStr;
 pub use timestamp::Timestamp;
 
-#[cfg(feature = "thin-vec")]
-pub use thin_vec::ThinVec as MaybeThinVec;
-
-#[cfg(not(feature = "thin-vec"))]
-pub type MaybeThinVec<T> = alloc::vec::Vec<T>;
+use alloc::vec::Vec;
 
 /// Default type returned by the embed server
 ///
@@ -23,6 +19,7 @@ pub type EmbedWithExpire = (Timestamp, Embed);
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[non_exhaustive]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[serde(tag = "v")]
 pub enum Embed {
     #[serde(rename = "1")]

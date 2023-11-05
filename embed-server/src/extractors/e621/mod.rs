@@ -6,7 +6,9 @@ pub struct E621ExtractorFactory;
 
 impl ExtractorFactory for E621ExtractorFactory {
     fn create(&self, config: &Config) -> Result<Option<Box<dyn Extractor>>, ConfigError> {
-        let Some(extractor) = config.parsed.extractors.get("e621").or_else(|| config.parsed.extractors.get("e926")) else {
+        let Some(extractor) =
+            config.parsed.extractors.get("e621").or_else(|| config.parsed.extractors.get("e926"))
+        else {
             return Ok(None);
         };
 
@@ -139,9 +141,8 @@ async fn fetch_single_id(
         embed.flags |= EmbedFlags::ADULT;
     }
 
-    let mut main_embed = BoxedEmbedMedia::default()
-        .with_url(file_url)
-        .with_dims(file.width as _, file.height as _);
+    let mut main_embed =
+        BoxedEmbedMedia::default().with_url(file_url).with_dims(file.width as _, file.height as _);
 
     if let Some(ext) = main_embed.url.split('.').last() {
         let mime = mime_guess::from_ext(ext).first();
@@ -198,20 +199,21 @@ async fn fetch_single_id(
             break 'vid_alt;
         };
 
-        let Some(Some(url)) = alt.urls.iter().find(|&url| matches!(url, Some(url) if !url.ends_with("webm"))) else {
+        let Some(Some(url)) = alt.urls.iter().find(|&url| matches!(url, Some(url) if !url.ends_with("webm")))
+        else {
             break 'vid_alt;
         };
 
-        let mut alt_media = BoxedEmbedMedia::default()
-            .with_url(url)
-            .with_dims(alt.width as _, alt.height as _);
+        let mut alt_media = BasicEmbedMedia::default();
 
-        alt_media.mime = url
-            .split('.')
-            .last()
-            .and_then(|ext| Some(mime_guess::from_ext(ext).first()?.to_smolstr()));
+        alt_media.url = url.into();
+        alt_media.width = Some(alt.width as _);
+        alt_media.height = Some(alt.height as _);
 
-        video.alternate = Some(alt_media);
+        alt_media.mime =
+            url.split('.').last().and_then(|ext| Some(mime_guess::from_ext(ext).first()?.to_smolstr()));
+
+        video.alts.push(alt_media);
     }
 
     embed.url = Some({
@@ -256,8 +258,7 @@ static E621_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e621"));
     provider.url = Some(SmolStr::new_inline("https://e621.net"));
-    provider.icon =
-        Some(BoxedEmbedMedia::default().with_url("https://e621.net/apple-touch-icon.png"));
+    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e621.net/apple-touch-icon.png"));
     provider
 });
 
@@ -265,7 +266,6 @@ static E926_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e926"));
     provider.url = Some(SmolStr::new_inline("https://e926.net"));
-    provider.icon =
-        Some(BoxedEmbedMedia::default().with_url("https://e926.net/apple-touch-icon.png"));
+    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e926.net/apple-touch-icon.png"));
     provider
 });

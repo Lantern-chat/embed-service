@@ -26,9 +26,7 @@ impl Extractor for GenericExtractor {
             return Err(Error::InvalidUrl);
         }
 
-        let site = url
-            .domain()
-            .and_then(|domain| state.config.find_site(domain));
+        let site = url.domain().and_then(|domain| state.config.find_site(domain));
 
         let mut resp = retry_request(2, || {
             let mut req = state.client.get(url.as_str());
@@ -80,11 +78,7 @@ impl Extractor for GenericExtractor {
 
         drop(links);
 
-        if let Some(mime) = resp
-            .headers()
-            .get("content-type")
-            .and_then(|h| h.to_str().ok())
-        {
+        if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
             let Some(mime) = mime.split(';').next() else {
                 return Err(Error::InvalidMimeType);
             };
@@ -111,10 +105,7 @@ impl Extractor for GenericExtractor {
                 drop(html); // ensure it lives long enough
             } else if matches!(
                 mime,
-                "application/rss+xml"
-                    | "application/feed+json"
-                    | "application/atom+xml"
-                    | "application/xml"
+                "application/rss+xml" | "application/feed+json" | "application/atom+xml" | "application/xml"
             ) {
                 let max = state.config.parsed.limits.max_xml_size;
                 let mut body = Vec::with_capacity(max.min(512));
@@ -193,14 +184,10 @@ impl Extractor for GenericExtractor {
     }
 }
 
-pub fn finalize_embed(
-    state: Arc<ServiceState>,
-    mut embed: EmbedV1,
-    max_age: Option<u64>,
-) -> EmbedWithExpire {
+pub fn finalize_embed(state: Arc<ServiceState>, mut embed: EmbedV1, max_age: Option<u64>) -> EmbedWithExpire {
     crate::parser::quirks::fix_embed(&mut embed);
 
-    embed.visit_media_mut(|media| {
+    embed.visit_media(|media| {
         media.signature = state.sign(&media.url);
     });
 
@@ -213,10 +200,7 @@ pub fn finalize_embed(
         embed
             .ts
             .checked_add(Duration::seconds(
-                max_age
-                    .unwrap_or(60 * 15)
-                    .min(60 * 60 * 24 * 30)
-                    .max(60 * 15) as i64,
+                max_age.unwrap_or(60 * 15).min(60 * 60 * 24 * 30).max(60 * 15) as i64,
             ))
             .unwrap()
     };
@@ -332,10 +316,7 @@ pub async fn resolve_images(
     Ok(())
 }
 
-pub async fn retry_request<F>(
-    max_attempts: u8,
-    mut make_request: F,
-) -> Result<reqwest::Response, Error>
+pub async fn retry_request<F>(max_attempts: u8, mut make_request: F) -> Result<reqwest::Response, Error>
 where
     F: FnMut() -> reqwest::RequestBuilder,
 {
@@ -371,9 +352,7 @@ pub async fn resolve_media(
     }
 
     let mut resp = retry_request(2, || {
-        let mut req = state
-            .client
-            .request(if head { Method::HEAD } else { Method::GET }, &*media.url);
+        let mut req = state.client.request(if head { Method::HEAD } else { Method::GET }, &*media.url);
 
         if let Some(ref site) = site {
             req = site.add_headers(&state.config, req);
@@ -383,11 +362,7 @@ pub async fn resolve_media(
     })
     .await?;
 
-    if let Some(mime) = resp
-        .headers()
-        .get("content-type")
-        .and_then(|h| h.to_str().ok())
-    {
+    if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
         media.mime = Some(mime.into());
 
         if !head && mime.starts_with("image") {

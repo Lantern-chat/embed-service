@@ -7,10 +7,7 @@ pub fn feed_into_embed(embed: &mut EmbedV1, feed: Feed) -> u64 {
     embed.description = feed.description.map(|t| t.content.into());
 
     if let Some(logo) = feed.logo {
-        image_to_media(
-            embed.provider.icon.get_or_insert_with(Default::default),
-            logo,
-        );
+        image_to_media(embed.provider.icon.get_or_insert_with(Default::default), logo);
     }
 
     if let Some(icon) = feed.icon {

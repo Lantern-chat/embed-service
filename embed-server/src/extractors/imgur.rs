@@ -46,9 +46,7 @@ impl Extractor for ImgurExtractor {
                 Some(potential_image_id) => potential_image_id,
                 None => return false,
             },
-            Some(potential_image_id) if !BAD_PATHS.contains(&potential_image_id) => {
-                potential_image_id
-            }
+            Some(potential_image_id) if !BAD_PATHS.contains(&potential_image_id) => potential_image_id,
             _ => return false,
         };
 
@@ -57,9 +55,7 @@ impl Extractor for ImgurExtractor {
             return false;
         };
 
-        potential_image_id
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric())
+        potential_image_id.chars().all(|c| c.is_ascii_alphanumeric())
     }
 
     #[instrument(skip_all)]
@@ -96,7 +92,10 @@ impl Extractor for ImgurExtractor {
             .json()
             .await?;
 
-        let ImgurResult::Success { data: Some(mut data), .. } = resp else {
+        let ImgurResult::Success {
+            data: Some(mut data), ..
+        } = resp
+        else {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
@@ -136,10 +135,10 @@ impl Extractor for ImgurExtractor {
             Some(ref mime) if mime.starts_with("video") => {
                 match image.mp4.take() {
                     Some(mp4) if mime.ends_with("webm") => {
-                        let mut alt = media.clone();
+                        let mut alt = media.media.clone();
                         alt.mime = Some(SmolStr::new_inline("video/mp4"));
                         alt.url = add_noredirect(mp4).into();
-                        media.alternate = Some(alt);
+                        media.alts.push(alt);
                     }
                     _ => {}
                 }

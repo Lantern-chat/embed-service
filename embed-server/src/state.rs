@@ -31,11 +31,11 @@ impl ServiceState {
                         let mut headers = HeaderMap::new();
 
                         headers.insert(
-                       HeaderName::from_static("accept"),
-                       HeaderValue::from_static(
-                           "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                       ),
-                    );
+                            HeaderName::from_static("accept"),
+                            HeaderValue::from_static(
+                                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                            ),
+                        );
 
                         headers.insert(HeaderName::from_static("dnt"), HeaderValue::from_static("1"));
                         headers.insert(
@@ -59,9 +59,7 @@ impl ServiceState {
                 let mut extractors = Vec::new();
 
                 for factory in crate::extractors::extractor_factories() {
-                    if let Some(extractor) =
-                        factory.create(&config).expect("Could not create extractor")
-                    {
+                    if let Some(extractor) = factory.create(&config).expect("Could not create extractor") {
                         extractors.push(extractor);
                     }
                 }
@@ -83,9 +81,7 @@ impl ServiceState {
 
         let mut buf = [0; 27];
         if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
-            return Some(FixedStr::new(unsafe {
-                std::str::from_utf8_unchecked(&buf)
-            }));
+            return Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
         }
 
         None

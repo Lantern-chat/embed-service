@@ -1,9 +1,12 @@
 use super::*;
 
+use core::ops::{Deref, DerefMut};
+
 use alloc::boxed::Box;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 #[serde(rename_all = "lowercase")]
 pub enum EmbedType {
     #[serde(alias = "image")]
@@ -44,6 +47,7 @@ fn is_none_or_empty(value: &Option<SmolStr>) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct EmbedV1 {
     /// Timestamp when the embed was retreived
     #[cfg_attr(feature = "typed-builder", builder(default = Timestamp::now_utc()))]
@@ -149,9 +153,9 @@ pub struct EmbedV1 {
     #[serde(default, skip_serializing_if = "EmbedMedia::is_empty")]
     pub thumb: Option<BoxedEmbedMedia>,
 
-    #[serde(default, skip_serializing_if = "MaybeThinVec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
-    pub fields: MaybeThinVec<EmbedField>,
+    pub fields: Vec<EmbedField>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(feature = "typed-builder", builder(default))]
@@ -205,7 +209,7 @@ impl EmbedV1 {
             f(&mut author.name);
         }
 
-        self.visit_media_mut(|media| visit_text_opt_mut(&mut media.description, &mut f));
+        self.visit_media(|media| visit_text_opt_mut(&mut media.description, &mut f));
 
         for field in &mut self.fields {
             f(&mut field.name);
@@ -217,36 +221,56 @@ impl EmbedV1 {
         }
     }
 
-    /// Visit each [`EmbedMedia`] to mutate them (such as to generate the proxy signature)
-    pub fn visit_media_mut<F>(&mut self, mut f: F)
+    pub fn visit_full_media<F>(&mut self, mut f: F)
     where
         F: FnMut(&mut EmbedMedia),
     {
-        EmbedMedia::visit_mut(&mut self.obj, &mut f);
-        EmbedMedia::visit_mut(&mut self.img, &mut f);
-        EmbedMedia::visit_mut(&mut self.audio, &mut f);
-        EmbedMedia::visit_mut(&mut self.video, &mut f);
-        EmbedMedia::visit_mut(&mut self.thumb, &mut f);
+        fn visit_opt<F>(value: &mut Option<BoxedEmbedMedia>, mut f: F)
+        where
+            F: FnMut(&mut EmbedMedia),
+        {
+            if let Some(media) = value {
+                f(media);
+            }
+        }
 
-        EmbedMedia::visit_mut(&mut self.provider.icon, &mut f);
+        visit_opt(&mut self.obj, &mut f);
+        visit_opt(&mut self.img, &mut f);
+        visit_opt(&mut self.audio, &mut f);
+        visit_opt(&mut self.video, &mut f);
+        visit_opt(&mut self.thumb, &mut f);
+        visit_opt(&mut self.provider.icon, &mut f);
 
         if let Some(ref mut footer) = self.footer {
-            EmbedMedia::visit_mut(&mut footer.icon, &mut f);
+            visit_opt(&mut footer.icon, &mut f);
         }
 
         if let Some(ref mut author) = self.author {
-            EmbedMedia::visit_mut(&mut author.icon, &mut f);
+            visit_opt(&mut author.icon, &mut f);
         }
 
         for field in &mut self.fields {
-            EmbedMedia::visit_mut(&mut field.img, &mut f);
+            visit_opt(&mut field.img, &mut f);
         }
+    }
+}
+
+impl VisitMedia for EmbedV1 {
+    /// Visit each [`EmbedMedia`] to mutate them (such as to generate the proxy signature)
+    fn visit_media<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut BasicEmbedMedia),
+    {
+        self.visit_full_media(|media| {
+            media.visit_media(&mut f);
+        })
     }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct EmbedFooter {
     #[serde(rename = "t", alias = "text")]
     #[cfg_attr(feature = "typed-builder", builder(setter(into)))]
@@ -266,6 +290,44 @@ pub struct EmbedFooter {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[repr(transparent)]
 pub struct BoxedEmbedMedia(Box<EmbedMedia>);
+
+#[cfg(feature = "rkyv")]
+const _: () = {
+    use rkyv::{
+        boxed::ArchivedBox, Archive, Archived, Deserialize, Fallible, Resolver, Serialize, SerializeUnsized,
+    };
+
+    impl Archive for BoxedEmbedMedia {
+        type Archived = Archived<Box<EmbedMedia>>;
+        type Resolver = Resolver<Box<EmbedMedia>>;
+
+        #[inline]
+        unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
+            ArchivedBox::resolve_from_ref(self.0.as_ref(), pos, resolver, out);
+        }
+    }
+
+    impl<S: Fallible + ?Sized> Serialize<S> for BoxedEmbedMedia
+    where
+        EmbedMedia: SerializeUnsized<S>,
+    {
+        #[inline]
+        fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
+            <Box<EmbedMedia> as Serialize<S>>::serialize(&self.0, serializer)
+        }
+    }
+
+    impl<D> Deserialize<BoxedEmbedMedia, D> for Archived<BoxedEmbedMedia>
+    where
+        D: Fallible + ?Sized,
+    {
+        #[inline]
+        fn deserialize(&self, deserializer: &mut D) -> Result<BoxedEmbedMedia, D::Error> {
+            <Archived<Box<EmbedMedia>> as Deserialize<Box<EmbedMedia>, D>>::deserialize(self, deserializer)
+                .map(BoxedEmbedMedia)
+        }
+    }
+};
 
 impl BoxedEmbedMedia {
     #[inline(always)]
@@ -299,7 +361,7 @@ impl BoxedEmbedMedia {
     }
 }
 
-impl core::ops::Deref for BoxedEmbedMedia {
+impl Deref for BoxedEmbedMedia {
     type Target = EmbedMedia;
 
     #[inline(always)]
@@ -308,7 +370,7 @@ impl core::ops::Deref for BoxedEmbedMedia {
     }
 }
 
-impl core::ops::DerefMut for BoxedEmbedMedia {
+impl DerefMut for BoxedEmbedMedia {
     #[inline(always)]
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
@@ -341,10 +403,111 @@ impl From<Box<EmbedMedia>> for BoxedEmbedMedia {
 
 pub type UrlSignature = FixedStr<27>;
 
+pub trait VisitMedia {
+    fn visit_media<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut BasicEmbedMedia);
+}
+
+impl VisitMedia for [BasicEmbedMedia] {
+    fn visit_media<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut BasicEmbedMedia),
+    {
+        self.iter_mut().for_each(f)
+    }
+}
+
+impl<T> VisitMedia for Option<T>
+where
+    T: VisitMedia,
+{
+    fn visit_media<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut BasicEmbedMedia),
+    {
+        if let Some(media) = self {
+            media.visit_media(f);
+        }
+    }
+}
+
+impl VisitMedia for BoxedEmbedMedia {
+    fn visit_media<F>(&mut self, f: F)
+    where
+        F: FnMut(&mut BasicEmbedMedia),
+    {
+        self.0.visit_media(f);
+    }
+}
+
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct EmbedMedia {
+    #[serde(flatten)]
+    pub media: BasicEmbedMedia,
+
+    #[serde(
+        rename = "a",
+        alias = "alternate",
+        alias = "alts",
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "de::de_one_or_many"
+    )]
+    #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    pub alts: Vec<BasicEmbedMedia>,
+}
+
+impl VisitMedia for EmbedMedia {
+    fn visit_media<F>(&mut self, mut f: F)
+    where
+        F: FnMut(&mut BasicEmbedMedia),
+    {
+        f(&mut self.media);
+        self.alts.visit_media(f);
+    }
+}
+
+mod de {
+    use super::{BasicEmbedMedia, Vec};
+
+    use serde::de::{Deserialize, Deserializer};
+
+    pub fn de_one_or_many<'de, D>(deserializer: D) -> Result<Vec<BasicEmbedMedia>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        pub enum OneOrMany<T> {
+            Many(Vec<T>),
+            One(T),
+        }
+
+        OneOrMany::deserialize(deserializer).map(|v| match v {
+            OneOrMany::Many(alts) => alts,
+            OneOrMany::One(alt) => alloc::vec![alt],
+        })
+    }
+}
+
+#[cfg(feature = "rkyv")]
+impl Deref for ArchivedEmbedMedia {
+    type Target = ArchivedBasicEmbedMedia;
+
+    fn deref(&self) -> &Self::Target {
+        &self.media
+    }
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+pub struct BasicEmbedMedia {
     #[serde(rename = "u", alias = "url")]
     pub url: SmolStr,
 
@@ -396,27 +559,32 @@ pub struct EmbedMedia {
     )]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
     pub mime: Option<SmolStr>,
+}
 
-    #[serde(
-        rename = "a",
-        alias = "alternate",
-        default,
-        skip_serializing_if = "EmbedMedia::is_empty"
-    )]
-    #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
-    pub alternate: Option<BoxedEmbedMedia>,
+impl Deref for EmbedMedia {
+    type Target = BasicEmbedMedia;
+
+    fn deref(&self) -> &BasicEmbedMedia {
+        &self.media
+    }
+}
+
+impl DerefMut for EmbedMedia {
+    fn deref_mut(&mut self) -> &mut BasicEmbedMedia {
+        &mut self.media
+    }
 }
 
 impl EmbedMedia {
     /// If `this` is is empty, but the alternate field is not empty, set this to the alternate
     pub fn normalize(this: &mut EmbedMedia) {
-        if let Some(ref mut alternate) = this.alternate {
-            alternate.alternate = None;
+        while this.url.is_empty() {
+            let Some(alt) = this.alts.pop() else { break };
 
-            if this.url.is_empty() {
-                // SAFETY: We literally just checked that this.alternate is Some
-                *this = unsafe { this.alternate.take().unwrap_unchecked().read() };
-            }
+            let alts = core::mem::take(&mut this.alts);
+
+            this.media = alt;
+            this.alts = alts;
         }
     }
 
@@ -426,20 +594,12 @@ impl EmbedMedia {
             None => true,
         }
     }
-
-    pub fn visit_mut<F>(this: &mut Option<BoxedEmbedMedia>, mut f: F)
-    where
-        F: FnMut(&mut EmbedMedia),
-    {
-        if let Some(ref mut media) = this {
-            f(&mut *media);
-        }
-    }
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct EmbedProvider {
     #[serde(
         rename = "n",
@@ -471,9 +631,7 @@ pub struct EmbedProvider {
 
 impl EmbedProvider {
     pub fn is_none(&self) -> bool {
-        is_none_or_empty(&self.name)
-            && is_none_or_empty(&self.url)
-            && EmbedMedia::is_empty(&self.icon)
+        is_none_or_empty(&self.name) && is_none_or_empty(&self.url) && EmbedMedia::is_empty(&self.icon)
     }
 }
 
@@ -481,9 +639,7 @@ impl EmbedAuthor {
     pub fn is_none(this: &Option<Self>) -> bool {
         match this {
             Some(ref this) => {
-                this.name.is_empty()
-                    && is_none_or_empty(&this.url)
-                    && EmbedMedia::is_empty(&this.icon)
+                this.name.is_empty() && is_none_or_empty(&this.url) && EmbedMedia::is_empty(&this.icon)
             }
             None => true,
         }
@@ -493,6 +649,7 @@ impl EmbedAuthor {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct EmbedAuthor {
     #[serde(rename = "n", alias = "name")]
     #[cfg_attr(feature = "typed-builder", builder(setter(into)))]
@@ -520,6 +677,7 @@ pub struct EmbedAuthor {
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "typed-builder", derive(typed_builder::TypedBuilder))]
+#[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
 pub struct EmbedField {
     #[serde(
         rename = "n",
@@ -543,12 +701,7 @@ pub struct EmbedField {
     pub img: Option<BoxedEmbedMedia>,
 
     /// Should use block-formatting
-    #[serde(
-        rename = "b",
-        alias = "block",
-        default,
-        skip_serializing_if = "is_false"
-    )]
+    #[serde(rename = "b", alias = "block", default, skip_serializing_if = "is_false")]
     #[cfg_attr(feature = "typed-builder", builder(default))]
     pub block: bool,
 }
@@ -578,7 +731,7 @@ impl Default for EmbedV1 {
             video: None,
             thumb: None,
             obj: None,
-            fields: MaybeThinVec::new(),
+            fields: Vec::new(),
             footer: None,
         }
     }

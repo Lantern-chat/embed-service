@@ -3,7 +3,7 @@ use embed::*;
 use url::Url;
 
 pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
-    embed.visit_media_mut(|media| {
+    embed.visit_media(|media| {
         // assume these are well-formed
         if media.url.starts_with("https://") || media.url.starts_with("http://") {
             return;
@@ -133,16 +133,16 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         // NOTE: SmolStr uses an Arc internally, so cloning is cheap
         let desc = embed.description.clone();
 
-        embed.visit_media_mut(|media| {
+        embed.visit_media(|media| {
             if media.description == desc {
                 media.description = None;
             }
         });
     }
 
-    embed.visit_media_mut(|media| {
-        EmbedMedia::normalize(media);
+    embed.visit_full_media(EmbedMedia::normalize);
 
+    embed.visit_media(|media| {
         maybe_trim_text(&mut media.description, 512);
     });
 

@@ -113,11 +113,7 @@ impl Site {
         }
     }
 
-    pub fn add_headers(
-        &self,
-        config: &Config,
-        mut req: reqwest::RequestBuilder,
-    ) -> reqwest::RequestBuilder {
+    pub fn add_headers(&self, config: &Config, mut req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
         if let Some(ref ua) = self.user_agent {
             if let Some(user_agent) = config.parsed.user_agents.get(ua) {
                 println!("Using {user_agent:?} for User Agent");
@@ -257,10 +253,6 @@ impl Config {
     pub fn find_site(&self, domain: &str) -> Option<Arc<Site>> {
         let domain = self.clean_domain(domain);
 
-        self.parsed
-            .sites
-            .values()
-            .find(|&site| site.matches(domain))
-            .cloned()
+        self.parsed.sites.values().find(|&site| site.matches(domain)).cloned()
     }
 }
