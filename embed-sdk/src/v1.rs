@@ -134,12 +134,15 @@ pub struct EmbedV1 {
     /// See: <https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/>
     #[serde(default, skip_serializing_if = "EmbedMedia::is_empty")]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub obj: Option<BoxedEmbedMedia>,
     #[serde(default, skip_serializing_if = "EmbedMedia::is_empty", alias = "image")]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub img: Option<BoxedEmbedMedia>,
     #[serde(default, skip_serializing_if = "EmbedMedia::is_empty")]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub audio: Option<BoxedEmbedMedia>,
     #[serde(
         rename = "vid",
@@ -148,9 +151,11 @@ pub struct EmbedV1 {
         skip_serializing_if = "EmbedMedia::is_empty"
     )]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub video: Option<BoxedEmbedMedia>,
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
     #[serde(default, skip_serializing_if = "EmbedMedia::is_empty")]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub thumb: Option<BoxedEmbedMedia>,
 
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -283,6 +288,7 @@ pub struct EmbedFooter {
         skip_serializing_if = "EmbedMedia::is_empty"
     )]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub icon: Option<BoxedEmbedMedia>,
 }
 
@@ -291,40 +297,64 @@ pub struct EmbedFooter {
 #[repr(transparent)]
 pub struct BoxedEmbedMedia(Box<EmbedMedia>);
 
+/// Rather than implement `Archive` directly on `BoxedEmbedMedia`, as all uses are as `Option<BoxedEmbedMedia>`,
+/// use `ArchiveWith` to achieve niche optimizations
+#[cfg(feature = "rkyv")]
+pub struct NicheEmbedMedia;
+
 #[cfg(feature = "rkyv")]
 const _: () = {
     use rkyv::{
-        boxed::ArchivedBox, Archive, Archived, Deserialize, Fallible, Resolver, Serialize, SerializeUnsized,
+        niche::option_box::{ArchivedOptionBox, OptionBoxResolver},
+        ser::Serializer,
+        with::{ArchiveWith, DeserializeWith, SerializeWith},
+        ArchiveUnsized, Archived, Deserialize, DeserializeUnsized, Fallible, MetadataResolver,
+        SerializeUnsized,
     };
 
-    impl Archive for BoxedEmbedMedia {
-        type Archived = Archived<Box<EmbedMedia>>;
-        type Resolver = Resolver<Box<EmbedMedia>>;
+    impl ArchiveWith<Option<BoxedEmbedMedia>> for NicheEmbedMedia {
+        type Archived = ArchivedOptionBox<Archived<EmbedMedia>>;
+        type Resolver = OptionBoxResolver<MetadataResolver<EmbedMedia>>;
 
-        #[inline]
-        unsafe fn resolve(&self, pos: usize, resolver: Self::Resolver, out: *mut Self::Archived) {
-            ArchivedBox::resolve_from_ref(self.0.as_ref(), pos, resolver, out);
+        unsafe fn resolve_with(
+            field: &Option<BoxedEmbedMedia>,
+            pos: usize,
+            resolver: Self::Resolver,
+            out: *mut Self::Archived,
+        ) {
+            ArchivedOptionBox::resolve_from_option(field.as_deref(), pos, resolver, out)
         }
     }
 
-    impl<S: Fallible + ?Sized> Serialize<S> for BoxedEmbedMedia
+    impl<S> SerializeWith<Option<BoxedEmbedMedia>, S> for NicheEmbedMedia
     where
         EmbedMedia: SerializeUnsized<S>,
+        S: Serializer + ?Sized,
     {
-        #[inline]
-        fn serialize(&self, serializer: &mut S) -> Result<Self::Resolver, S::Error> {
-            <Box<EmbedMedia> as Serialize<S>>::serialize(&self.0, serializer)
+        fn serialize_with(
+            field: &Option<BoxedEmbedMedia>,
+            serializer: &mut S,
+        ) -> Result<Self::Resolver, S::Error> {
+            ArchivedOptionBox::serialize_from_option(field.as_deref(), serializer)
         }
     }
 
-    impl<D> Deserialize<BoxedEmbedMedia, D> for Archived<BoxedEmbedMedia>
+    impl<D> DeserializeWith<ArchivedOptionBox<Archived<EmbedMedia>>, Option<BoxedEmbedMedia>, D>
+        for NicheEmbedMedia
     where
+        EmbedMedia: ArchiveUnsized,
+        Archived<EmbedMedia>: DeserializeUnsized<EmbedMedia, D>,
         D: Fallible + ?Sized,
     {
-        #[inline]
-        fn deserialize(&self, deserializer: &mut D) -> Result<BoxedEmbedMedia, D::Error> {
-            <Archived<Box<EmbedMedia>> as Deserialize<Box<EmbedMedia>, D>>::deserialize(self, deserializer)
-                .map(BoxedEmbedMedia)
+        fn deserialize_with(
+            field: &ArchivedOptionBox<Archived<EmbedMedia>>,
+            deserializer: &mut D,
+        ) -> Result<Option<BoxedEmbedMedia>, D::Error> {
+            if let Some(value) = field.as_ref() {
+                Ok(Some(BoxedEmbedMedia(value.deserialize(deserializer)?)))
+            } else {
+                Ok(None)
+            }
         }
     }
 };
@@ -626,6 +656,7 @@ pub struct EmbedProvider {
         skip_serializing_if = "EmbedMedia::is_empty"
     )]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub icon: Option<BoxedEmbedMedia>,
 }
 
@@ -671,6 +702,7 @@ pub struct EmbedAuthor {
         skip_serializing_if = "EmbedMedia::is_empty"
     )]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub icon: Option<BoxedEmbedMedia>,
 }
 
@@ -698,6 +730,7 @@ pub struct EmbedField {
 
     #[serde(default, skip_serializing_if = "EmbedMedia::is_empty", alias = "image")]
     #[cfg_attr(feature = "typed-builder", builder(default, setter(into)))]
+    #[cfg_attr(feature = "rkyv", with(NicheEmbedMedia))]
     pub img: Option<BoxedEmbedMedia>,
 
     /// Should use block-formatting
