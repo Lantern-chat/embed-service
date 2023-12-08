@@ -20,6 +20,7 @@ pub type EmbedWithExpire = (Timestamp, Embed);
 #[non_exhaustive]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "rkyv", derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize))]
+#[cfg_attr(feature = "rkyv", archive(check_bytes))]
 #[serde(tag = "v")]
 pub enum Embed {
     #[serde(rename = "1")]
@@ -39,4 +40,14 @@ impl Embed {
 
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_rkyv() {
+        _ = rkyv::check_archived_root::<Embed>(&[]);
+    }
 }
