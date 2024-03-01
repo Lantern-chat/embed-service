@@ -21,6 +21,7 @@ pub enum EmbedType {
 }
 
 bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub struct EmbedFlags: i16 {
         /// This embed contains spoilered content and should be displayed as such
         const SPOILER   = 1 << 0;
