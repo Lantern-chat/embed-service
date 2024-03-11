@@ -64,17 +64,17 @@ async fn main() {
 
     info!(%addr, "Starting...");
 
-    axum::Server::bind(&addr)
-        .serve(
-            post(root)
-                .route_layer(CatchPanicLayer::new())
-                .with_state(state)
-                .layer(TraceLayer::new_for_http())
-                .into_make_service(),
-        )
-        .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
-        .await
-        .expect("Unable to run embed-worker");
+    axum::serve(
+        tokio::net::TcpListener::bind(addr).await.expect("Unable to bind to address"),
+        post(root)
+            .route_layer(CatchPanicLayer::new())
+            .with_state(state)
+            .layer(TraceLayer::new_for_http())
+            .into_make_service(),
+    )
+    .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
+    .await
+    .expect("Unable to run embed-worker");
 
     info!("Goodbye.");
 }

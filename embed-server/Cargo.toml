@@ -7,21 +7,25 @@ authors = ["Nova <novacrazy@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies.reqwest]
+git = "https://github.com/seanmonstar/reqwest"
+default_features = false
+features = ["rustls-tls", "http2", "json", "gzip", "brotli", "deflate"]
+
 [dependencies]
 common = { package = "client-sdk-common", git = "https://github.com/Lantern-chat/client-sdk-rs" }
 embed = { package = "embed-sdk", path = "../embed-sdk" }
 
-reqwest = { version = "0.11", default_features = false, features = ["rustls-tls", "json", "gzip", "brotli", "deflate"] }
 tokio = { version = "1", features = ["full"] }
-axum = { version = "0.6", features = ["http2"] }
-tower-http = { version = "0.4", features = ["catch-panic", "trace"] }
+axum = { version = "0.7", features = ["http2"] }
+tower-http = { version = "0.5", features = ["catch-panic", "trace"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 
 hashbrown = { version = "0.14", features = ["inline-more", "serde"] }
 iso8601-timestamp = "0.2"
 imagesize = "0.12.0"
-base64 = "0.21"
+base64 = "0.22"
 hmac = "0.12.1"
 sha1 = "0.10.5"
 hex = "0.4.3"
