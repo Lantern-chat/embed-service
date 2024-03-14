@@ -9,6 +9,7 @@ authors = ["Nova <novacrazy@gmail.com>"]
 
 [dependencies.reqwest]
 git = "https://github.com/seanmonstar/reqwest"
+branch = "0.12-dev"
 default_features = false
 features = ["rustls-tls", "http2", "json", "gzip", "brotli", "deflate"]
 
