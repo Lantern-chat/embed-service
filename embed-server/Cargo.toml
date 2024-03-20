@@ -7,18 +7,13 @@ authors = ["Nova <novacrazy@gmail.com>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies.reqwest]
-git = "https://github.com/seanmonstar/reqwest"
-branch = "0.12-dev"
-default_features = false
-features = ["rustls-tls", "http2", "json", "gzip", "brotli", "deflate"]
-
 [dependencies]
 common = { package = "client-sdk-common", git = "https://github.com/Lantern-chat/client-sdk-rs" }
 embed = { package = "embed-sdk", path = "../embed-sdk" }
 
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.7", features = ["http2"] }
+reqwest = { version = "0.12", default_features = false, features = ["rustls-tls", "http2", "json", "gzip", "brotli", "deflate"] }
 tower-http = { version = "0.5", features = ["catch-panic", "trace"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
