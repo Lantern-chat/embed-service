@@ -50,6 +50,9 @@ pub struct ParsedConfig {
     #[serde(default = "defaults::default_redirects")]
     pub max_redirects: u32,
 
+    #[serde(default = "defaults::default_cache_size")]
+    pub cache_size: usize,
+
     /// Request timeout, in milliseconds
     #[serde(default = "defaults::default_timeout")]
     pub timeout: u64,
@@ -88,6 +91,7 @@ mod defaults {
     pub const fn default_timeout() -> u64 { 4000 }
     pub const fn default_resolve_media() -> bool { true }
     pub const fn default_signed() -> bool { true }
+    pub const fn default_cache_size() -> usize { 1024 }
 }
 
 #[derive(Default, Debug, Clone, serde::Deserialize)]

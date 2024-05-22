@@ -1,4 +1,4 @@
-use crate::{config::Config, extractors::Extractor};
+use crate::{cache::EmbedCache, config::Config, extractors::Extractor};
 
 use hmac::{digest::Key, Mac};
 pub type Hmac = hmac::SimpleHmac<sha1::Sha1>;
@@ -10,6 +10,7 @@ pub struct ServiceState {
     pub signing_key: Option<Key<Hmac>>,
     pub client: reqwest::Client,
     pub extractors: Vec<Box<dyn Extractor>>,
+    pub cache: EmbedCache,
 }
 
 use common::fixed::FixedStr;
@@ -66,14 +67,15 @@ impl ServiceState {
 
                 extractors
             },
+
+            cache: EmbedCache::new(config.parsed.cache_size),
+
             config,
         }
     }
 
     pub fn sign(&self, value: &str) -> Option<FixedStr<27>> {
-        let Some(ref key) = self.signing_key else {
-            return None;
-        };
+        let key = self.signing_key.as_ref()?;
 
         use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
 

@@ -12,6 +12,7 @@ extern crate serde;
 #[macro_use]
 extern crate tracing;
 
+pub mod cache;
 pub mod config;
 pub mod error;
 pub mod extractors;
@@ -24,14 +25,18 @@ use error::Error;
 use state::ServiceState;
 
 use axum::{
+    body::Bytes,
     extract::{Query, State},
     http::StatusCode,
     routing::post,
     Json,
 };
 use futures_util::FutureExt;
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{borrow::Cow, net::SocketAddr, str::FromStr, sync::Arc};
 use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
+use triomphe::Arc as TArc;
+
+use crate::error::CacheError;
 
 #[tokio::main]
 async fn main() {
@@ -89,26 +94,19 @@ pub struct Params {
 async fn root(
     State(state): State<Arc<ServiceState>>,
     Query(params): Query<Params>,
-    body: String,
-) -> Result<Json<extractors::EmbedWithExpire>, (StatusCode, String)> {
+    body: Bytes,
+) -> Result<Json<TArc<extractors::EmbedWithExpire>>, (StatusCode, Cow<'static, str>)> {
     let url = body; // to avoid confusion
 
     match inner(state, url, params).await {
         Ok(value) => Ok(Json(value)),
         Err(e) => Err({
-            let code = match e {
-                Error::InvalidUrl | Error::UrlError(_) => StatusCode::BAD_REQUEST,
-                Error::InvalidMimeType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
-                Error::Failure(code) => code,
-                Error::ReqwestError(ref e) => match e.status() {
-                    Some(status) => status,
-                    None if e.is_connect() => StatusCode::REQUEST_TIMEOUT,
-                    None => StatusCode::INTERNAL_SERVER_ERROR,
-                },
-                Error::JsonError(_) | Error::XMLError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            let code = e.status_code();
+            let msg = if code.is_server_error() {
+                Cow::Borrowed("Internal Server Error")
+            } else {
+                Cow::Owned(e.to_string())
             };
-
-            let msg = if code.is_server_error() { "Internal Server Error".to_owned() } else { e.to_string() };
 
             (code, msg)
         }),
@@ -117,14 +115,44 @@ async fn root(
 
 async fn inner(
     state: Arc<ServiceState>,
-    url: String,
+    orig_url: Bytes,
     params: Params,
-) -> Result<extractors::EmbedWithExpire, Error> {
-    let url = url::Url::parse(&url)?;
+) -> Result<TArc<extractors::EmbedWithExpire>, Error> {
+    use cache::{CacheHit, CacheState};
+
+    let url = url::Url::parse(core::str::from_utf8(&orig_url).map_err(|_| Error::InvalidUrl)?)?;
+
+    let (tx, rx) = match state.cache.get(&orig_url).await? {
+        CacheHit::Hit(embed) => return Ok(embed),
+        CacheHit::Miss(tx, rx) => (tx, rx),
+        CacheHit::Pending(mut rx) => loop {
+            if rx.changed().await.is_err() {
+                return Err(Error::Failure(StatusCode::INTERNAL_SERVER_ERROR));
+            }
+
+            match rx.borrow().clone() {
+                Some(CacheState::Ready(embed)) => return Ok(embed),
+                Some(CacheState::Errored(err)) => return Err(Error::CacheError(err)),
+                None => continue,
+            }
+        },
+    };
 
     for extractor in &state.extractors {
-        if extractor.matches(&url) {
-            return extractor.extract(state.clone(), url, params).await;
+        if !extractor.matches(&url) {
+            continue;
+        }
+
+        let cached = match extractor.extract(state.clone(), url, params).await {
+            Ok(embed) => CacheState::Ready(TArc::new(embed)),
+            Err(e) => CacheState::Errored(TArc::new(CacheError::new(e))),
+        };
+
+        state.cache.put(orig_url, tx, rx, cached.clone()).await;
+
+        match cached {
+            CacheState::Ready(embed) => return Ok(embed),
+            CacheState::Errored(err) => return Err(Error::CacheError(err)),
         }
     }
 

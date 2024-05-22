@@ -21,7 +21,8 @@ pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
             // I've seen this before, where "https://" is replaced with "undefined//"
             for prefix in ["undefined//", "//"] {
                 if let Some(old) = old.strip_prefix(prefix) {
-                    url = base_url.scheme().to_owned();
+                    base_url.scheme().clone_into(&mut url);
+
                     url += "//";
                     url += old;
                     break 'media_url url;

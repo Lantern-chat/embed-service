@@ -251,8 +251,9 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                 match extra.link {
                     Some(ref mut existing) => {
                         if ty.contains("json") {
-                            existing.url = link.href.clone();
-                            existing.title = link.title.clone();
+                            existing.url.clone_from(&link.href);
+                            existing.title.clone_from(&link.title);
+
                             existing.format = OEmbedFormat::JSON;
                         }
                     }
