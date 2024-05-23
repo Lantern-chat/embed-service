@@ -34,15 +34,18 @@ pub struct EmbedCache {
     storage: Vec<Cache>,
 }
 
+pub struct CacheMiss {
+    pub tx: Sender<Option<CacheState>>,
+    pub rx: Receiver<Option<CacheState>>,
+}
+
 pub enum CacheHit {
     /// The cache had a hit and the embed was returned
     Hit(Arc<EmbedWithExpire>),
     /// The cache had a miss and the request is pending
     Pending(Receiver<Option<CacheState>>),
     /// The cache had a miss and the caller is responsible for updating the cache
-    ///
-    /// The receiver must be kept alive for the duration of the request
-    Miss(Sender<Option<CacheState>>, Receiver<Option<CacheState>>),
+    Miss(CacheMiss),
 }
 
 impl EmbedCache {
@@ -71,14 +74,8 @@ impl EmbedCache {
         Ok(None)
     }
 
-    pub async fn put(
-        &self,
-        key: Bytes,
-        tx: Sender<Option<CacheState>>,
-        rx: Receiver<Option<CacheState>>,
-        embed: CacheState,
-    ) {
-        tx.send_replace(Some(match self.cache.entry_async(key.clone()).await {
+    pub async fn put(&self, key: Bytes, miss: CacheMiss, embed: CacheState) {
+        miss.tx.send_replace(Some(match self.cache.entry_async(key.clone()).await {
             CacheEntry::Occupied(mut occ) => {
                 let old = occ.get();
 
@@ -101,7 +98,7 @@ impl EmbedCache {
 
         self.pending.remove_async(&key).await;
 
-        drop(rx); // always do this last for any pending get requests
+        drop(miss); // always do this last for any pending get requests
     }
 
     pub async fn get(&self, key: &Bytes) -> Result<CacheHit, Error> {
@@ -141,7 +138,7 @@ impl EmbedCache {
 
                     _ = occ.remove_entry(); // remove + unlock bucket here
 
-                    Ok(CacheHit::Miss(tx, rx))
+                    Ok(CacheHit::Miss(CacheMiss { tx, rx }))
                 }
             },
             CacheEntry::Vacant(vac) => {
@@ -172,7 +169,7 @@ impl EmbedCache {
 
                         Ok(CacheHit::Hit(embed))
                     }
-                    None => Ok(CacheHit::Miss(tx, rx)),
+                    None => Ok(CacheHit::Miss(CacheMiss { tx, rx })),
                 }
             }
         }

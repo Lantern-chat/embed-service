@@ -122,9 +122,9 @@ async fn inner(
 
     let url = url::Url::parse(core::str::from_utf8(&orig_url).map_err(|_| Error::InvalidUrl)?)?;
 
-    let (tx, rx) = match state.cache.get(&orig_url).await? {
+    let miss = match state.cache.get(&orig_url).await? {
         CacheHit::Hit(embed) => return Ok(embed),
-        CacheHit::Miss(tx, rx) => (tx, rx),
+        CacheHit::Miss(miss) => miss,
         CacheHit::Pending(mut rx) => loop {
             if rx.changed().await.is_err() {
                 return Err(Error::Failure(StatusCode::INTERNAL_SERVER_ERROR));
@@ -148,7 +148,7 @@ async fn inner(
             Err(e) => CacheState::Errored(TArc::new(CacheError::new(e))),
         };
 
-        state.cache.put(orig_url, tx, rx, cached.clone()).await;
+        state.cache.put(orig_url, miss, cached.clone()).await;
 
         match cached {
             CacheState::Ready(embed) => return Ok(embed),
