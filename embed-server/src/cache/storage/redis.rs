@@ -15,8 +15,10 @@ pub struct RedisCache {
 }
 
 impl CacheFactory for RedisCache {
-    fn create(&self, config: &HashMap<String, String>) -> Result<Cache, Error> {
-        let url = config.get("url").ok_or(Error::ConfigError(ConfigError::MissingCacheField("redis.url")))?;
+    fn create(config: &HashMap<String, String>) -> Result<Cache, Error> {
+        let Some(url) = config.get("url") else {
+            return Err(Error::ConfigError(ConfigError::MissingCacheField("redis.url")));
+        };
 
         let client = fred::clients::RedisClient::new(RedisConfig::from_url(url)?, None, None, None);
 
@@ -44,6 +46,12 @@ impl CacheStorage for RedisCache {
         let expires = value.0.duration_since(Timestamp::UNIX_EPOCH).whole_milliseconds() as i64;
 
         self.client.set(key, json, Some(Expiration::PXAT(expires)), None, false).await?;
+
+        Ok(())
+    }
+
+    async fn del(&self, key: Bytes) -> Result<(), Error> {
+        self.client.del(key).await?;
 
         Ok(())
     }

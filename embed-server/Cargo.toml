@@ -8,9 +8,11 @@ authors = ["Nova <novacrazy@gmail.com>"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["cache_redis", "cache_rusqlite", "sonic_json"]
+default = ["cache_redis", "cache_rusqlite", "cache_redb", "sonic_json"]
 cache_redis = ["fred"]
 cache_rusqlite = ["r2d2_sqlite", "r2d2", "blake3"]
+cache_redb = ["redb"]
+
 sonic_json = ["sonic-rs"]
 
 # cache_pg = ["cache", "tokio-postgres"]
@@ -24,7 +26,7 @@ axum = { version = "0.7", features = ["http2"] }
 reqwest = { version = "0.12", default_features = false, features = ["rustls-tls", "http2", "json", "gzip", "brotli", "deflate"] }
 tower-http = { version = "0.5", features = ["catch-panic", "trace"] }
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 hashbrown = { version = "0.14", features = ["inline-more", "serde"] }
 iso8601-timestamp = "0.2"
@@ -69,6 +71,8 @@ fred = { version = "9.0", optional = true, features = ["serde-json"] }
 r2d2 = { version = "0.8.0", optional = true }
 r2d2_sqlite = { version = "0.24.0", optional = true, features = ["bundled"] }
 blake3 = { version = "1.5.1", optional = true }
+
+redb = { version = "2.0", optional = true }
 
 
 # redis = { version = "0.25.3", optional = true, features = ["tokio-comp", "ahash", "connection-manager"] }

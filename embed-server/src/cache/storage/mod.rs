@@ -9,17 +9,25 @@ pub mod redis;
 #[cfg(feature = "cache_rusqlite")]
 pub mod sqlite;
 
+#[cfg(feature = "cache_redb")]
+pub mod redb;
+
 use crate::error::Error;
 
 pub type CachedEmbed = Arc<EmbedWithExpire>;
 
 pub(crate) trait CacheFactory: Sized {
-    fn create(&self, config: &HashMap<String, String>) -> Result<Cache, Error>;
+    fn create(config: &HashMap<String, String>) -> Result<Cache, Error>;
 }
 
 pub(crate) trait CacheStorage: Sized {
     async fn get(&self, now: Timestamp, key: Bytes) -> Result<Option<CachedEmbed>, Error>;
     async fn put(&self, now: Timestamp, key: Bytes, value: CachedEmbed) -> Result<(), Error>;
+    async fn del(&self, key: Bytes) -> Result<(), Error>;
+
+    async fn shutdown(self) -> Result<(), Error> {
+        Ok(())
+    }
 }
 
 macro_rules! impl_cache {
@@ -46,6 +54,20 @@ macro_rules! impl_cache {
             async fn put(&self, now: Timestamp, key: Bytes, value: CachedEmbed) -> Result<(), Error> {
                 match self {
                     $($(#[$meta])* Cache::$name(inner) => inner.put(now, key, value).await,)*
+                    _ => Ok(()),
+                }
+            }
+
+            async fn del(&self, key: Bytes) -> Result<(), Error> {
+                match self {
+                    $($(#[$meta])* Cache::$name(inner) => inner.del(key).await,)*
+                    _ => Ok(()),
+                }
+            }
+
+            async fn shutdown(self) -> Result<(), Error> {
+                match self {
+                    $($(#[$meta])* Cache::$name(inner) => inner.shutdown().await,)*
                     _ => Ok(()),
                 }
             }
@@ -83,5 +105,8 @@ impl_cache! {
     Redis => redis::RedisCache,
 
     #[cfg(feature = "cache_rusqlite")]
-    Sqlite => sqlite::SqliteCache
+    Sqlite => sqlite::SqliteCache,
+
+    #[cfg(feature = "cache_redb")]
+    Redb => redb::RedbCache
 }

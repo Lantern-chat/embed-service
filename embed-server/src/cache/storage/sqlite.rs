@@ -11,9 +11,10 @@ pub struct SqliteCache {
 }
 
 impl CacheFactory for SqliteCache {
-    fn create(&self, config: &HashMap<String, String>) -> Result<Cache, Error> {
-        let path =
-            config.get("path").ok_or(Error::ConfigError(ConfigError::MissingCacheField("sqlite.path")))?;
+    fn create(config: &HashMap<String, String>) -> Result<Cache, Error> {
+        let Some(path) = config.get("path") else {
+            return Err(Error::ConfigError(ConfigError::MissingCacheField("sqlite.path")));
+        };
 
         Self::open(path).map(Cache::Sqlite)
     }
@@ -42,33 +43,25 @@ impl SqliteCache {
     fn get_blocking(&self, now: Timestamp, key: Bytes) -> Result<Option<CachedEmbed>, Error> {
         let hash = blake3::hash(key.as_ref());
 
-        let mut db = self.pool.get()?;
-        let mut t = db.transaction()?;
+        let db = self.pool.get()?;
 
-        t.set_drop_behavior(r2d2_sqlite::rusqlite::DropBehavior::Rollback);
+        let embed = {
+            let mut q = db.prepare("SELECT embed FROM embeds WHERE hash = ? AND url = ? LIMIT 1")?;
 
-        let mut embed = t.query_row_and_then(
-            "SELECT embed FROM embeds WHERE hash = ? AND url = ?",
-            [hash.as_bytes(), key.as_ref()],
-            |row| {
+            let mut rows = q.query_and_then([hash.as_bytes(), key.as_ref()], |row| {
                 let embed: String = row.get(0)?;
                 let embed: CachedEmbed = json_impl::from_str(&embed)?;
 
                 Ok::<_, Error>(Some(embed))
-            },
-        )?;
+            })?;
+
+            rows.next().transpose()?.flatten()
+        };
 
         // expired
         if matches!(embed, Some(ref e) if e.0 < now) {
-            t.execute(
-                "DELETE FROM embeds WHERE hash = ? AND url = ?",
-                [hash.as_bytes(), key.as_ref()],
-            )?;
-
-            embed = None;
+            return Ok(None);
         }
-
-        t.commit()?;
 
         Ok(embed)
     }
@@ -101,5 +94,16 @@ impl CacheStorage for SqliteCache {
         tokio::task::spawn_blocking(move || this.put_blocking(now, key, value))
             .await
             .expect("Unable to spawn blocking task")
+    }
+
+    async fn del(&self, key: Bytes) -> Result<(), Error> {
+        let hash = blake3::hash(key.as_ref());
+
+        self.pool.get()?.execute(
+            "DELETE FROM embeds WHERE hash = ? AND url = ?",
+            [hash.as_bytes(), key.as_ref()],
+        )?;
+
+        Ok(())
     }
 }

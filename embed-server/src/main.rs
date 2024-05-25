@@ -4,8 +4,6 @@
     clippy::large_enum_variant
 )]
 
-//extern crate client_sdk as sdk;
-
 #[macro_use]
 extern crate serde;
 
@@ -47,6 +45,7 @@ use crate::error::CacheError;
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+
     if let Err(error) = dotenv::dotenv() {
         warn!(?error, "Couldn't read .env file. Continuing execution anyway");
     }
@@ -79,13 +78,19 @@ async fn main() {
         tokio::net::TcpListener::bind(addr).await.expect("Unable to bind to address"),
         post(root)
             .route_layer(CatchPanicLayer::new())
-            .with_state(state)
+            .with_state(state.clone())
             .layer(TraceLayer::new_for_http())
             .into_make_service(),
     )
     .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
     .await
     .expect("Unable to run embed-worker");
+
+    info!("Shutting down...");
+
+    let state = Arc::into_inner(state).expect("State unavailable");
+
+    state.cache.shutdown().await;
 
     info!("Goodbye.");
 }
@@ -107,6 +112,8 @@ async fn root(
     match inner(state, url, params).await {
         Ok(value) => Ok(Json(value)),
         Err(e) => Err({
+            tracing::error!("Error processing request: {e:?}");
+
             let code = e.status_code();
             let msg = if code.is_server_error() {
                 Cow::Borrowed("Internal Server Error")

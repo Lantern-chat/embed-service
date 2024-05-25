@@ -1,5 +1,6 @@
 use axum::body::Bytes;
 use embed::{EmbedWithExpire, Timestamp};
+use futures_util::StreamExt;
 use scc::hash_cache::Entry as CacheEntry;
 use tokio::sync::watch::{self, Receiver, Sender};
 use triomphe::Arc;
@@ -57,6 +58,16 @@ impl EmbedCache {
         }
     }
 
+    pub async fn shutdown(self) {
+        futures_util::stream::iter(self.storage)
+            .for_each_concurrent(None, |storage| async move {
+                if let Err(e) = storage.shutdown().await {
+                    tracing::error!("Error shutting down cache storage: {e:?}");
+                }
+            })
+            .await;
+    }
+
     pub fn add_storage(&mut self, storage: Cache) {
         self.storage.push(storage);
     }
@@ -78,27 +89,45 @@ impl EmbedCache {
         Ok(None)
     }
 
-    pub async fn put(&self, key: Bytes, miss: CacheMiss, embed: CacheState) {
-        miss.tx.send_replace(Some(match self.cache.entry_async(key.clone()).await {
+    pub async fn put(&self, key: Bytes, miss: CacheMiss, mut embed: CacheState) {
+        let mut propogate = true;
+
+        match self.cache.entry_async(key.clone()).await {
             CacheEntry::Occupied(mut occ) => {
                 let old = occ.get();
 
                 // if the entry has an earlier expiration or errored, replace it
                 if old.expires() < embed.expires() || old.is_err() {
                     occ.put(embed.clone());
-
-                    embed
                 } else {
                     // otherwise go with the latest
-                    old.clone()
+                    embed = old.clone();
+                    propogate = false;
                 }
             }
             CacheEntry::Vacant(vac) => {
                 vac.put_entry(embed.clone());
-
-                embed
             }
-        }));
+        }
+
+        if propogate {
+            let now = Timestamp::now_utc();
+
+            futures_util::stream::iter(&self.storage)
+                .for_each_concurrent(None, |storage| async {
+                    let res = match embed.clone() {
+                        CacheState::Errored(_) => storage.del(key.clone()).await,
+                        CacheState::Ready(e) => storage.put(now, key.clone(), e).await,
+                    };
+
+                    if let Err(e) = res {
+                        tracing::error!("Error updating cache storage: {e:?}");
+                    }
+                })
+                .await;
+        }
+
+        miss.tx.send_replace(Some(embed));
 
         self.pending.remove_async(&key).await;
 
@@ -167,9 +196,15 @@ impl EmbedCache {
                 // explicitely unlock the bucket, despite not actually inserting anything
                 drop(vac);
 
-                match self.get_tiered(key, now).await? {
+                tracing::debug!("Cache miss: {:?}", key.clone());
+
+                match self.get_tiered(key.clone(), now).await? {
                     Some(embed) => {
-                        tx.send_replace(Some(CacheState::Ready(embed.clone())));
+                        let state = CacheState::Ready(embed.clone());
+
+                        _ = self.cache.put_async(key, state.clone()).await;
+
+                        tx.send_replace(Some(state));
 
                         Ok(CacheHit::Hit(embed))
                     }

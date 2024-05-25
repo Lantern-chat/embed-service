@@ -43,6 +43,10 @@ pub enum Error {
     #[cfg(feature = "cache_rusqlite")]
     #[error("SQLite Error: {0}")]
     SqliteError(#[from] r2d2_sqlite::rusqlite::Error),
+
+    #[cfg(feature = "cache_redb")]
+    #[error("ReDB Error: {0}")]
+    ReDBError(#[from] redb::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -72,6 +76,9 @@ impl Error {
 
             #[cfg(feature = "cache_rusqlite")]
             Error::SqlitePoolError(_) | Error::SqliteError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+            #[cfg(feature = "cache_redb")]
+            Error::ReDBError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }
@@ -84,3 +91,27 @@ impl CacheError {
         }
     }
 }
+
+#[cfg(feature = "cache_redb")]
+const _: () = {
+    macro_rules! from_redb {
+        ($($ty:ty),*) => {
+            $(
+                impl From<$ty> for Error {
+                    fn from(err: $ty) -> Error {
+                        Error::ReDBError(err.into())
+                    }
+                }
+            )*
+        };
+    }
+
+    from_redb!(
+        redb::CommitError,
+        redb::CompactionError,
+        redb::DatabaseError,
+        redb::StorageError,
+        redb::TableError,
+        redb::TransactionError
+    );
+};
