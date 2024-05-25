@@ -5,6 +5,9 @@ use triomphe::Arc;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("Config Error: {0}")]
+    ConfigError(#[from] crate::config::ConfigError),
+
     #[error("Invalid URL")]
     InvalidUrl,
 
@@ -15,7 +18,7 @@ pub enum Error {
     InvalidMimeType,
 
     #[error("JSON Error: {0}")]
-    JsonError(#[from] serde_json::Error),
+    JsonError(#[from] json_impl::Error),
 
     #[error("XML Error: {0}")]
     XMLError(#[from] quick_xml::de::DeError),
@@ -28,6 +31,18 @@ pub enum Error {
 
     #[error("Cache Error: {0}")]
     CacheError(Arc<CacheError>),
+
+    #[cfg(feature = "cache_redis")]
+    #[error("Redis Error: {0}")]
+    RedisError(#[from] fred::error::RedisError),
+
+    #[cfg(feature = "cache_rusqlite")]
+    #[error("SQLite Pool Error: {0}")]
+    SqlitePoolError(#[from] r2d2::Error),
+
+    #[cfg(feature = "cache_rusqlite")]
+    #[error("SQLite Error: {0}")]
+    SqliteError(#[from] r2d2_sqlite::rusqlite::Error),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -40,6 +55,7 @@ pub struct CacheError {
 impl Error {
     pub fn status_code(&self) -> StatusCode {
         match self {
+            Error::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::InvalidUrl | Error::UrlError(_) => StatusCode::BAD_REQUEST,
             Error::InvalidMimeType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
             Error::Failure(code) => *code,
@@ -50,6 +66,12 @@ impl Error {
             },
             Error::JsonError(_) | Error::XMLError(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Error::CacheError(err) => err.error.status_code(),
+
+            #[cfg(feature = "cache_redis")]
+            Error::RedisError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+
+            #[cfg(feature = "cache_rusqlite")]
+            Error::SqlitePoolError(_) | Error::SqliteError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 }

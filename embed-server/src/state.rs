@@ -68,7 +68,21 @@ impl ServiceState {
                 extractors
             },
 
-            cache: EmbedCache::new(config.parsed.cache_size),
+            cache: {
+                let mut cache = EmbedCache::new(config.parsed.cache_size);
+
+                let raw_configs = &config.parsed.cache;
+                let mut sorted_configs = raw_configs.iter().collect::<Vec<_>>();
+
+                sorted_configs.sort_by_key(|c| c.0.order);
+
+                for (name, config) in sorted_configs {
+                    let storage = todo!();
+                    cache.add_storage(storage);
+                }
+
+                cache
+            },
 
             config,
         }

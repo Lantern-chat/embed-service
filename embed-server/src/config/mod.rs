@@ -25,6 +25,12 @@ pub enum ConfigError {
 
     #[error("Invalid extractor field: extractors.{0}")]
     InvalidExtractorField(&'static str),
+
+    #[error("Missing cache field: cache.{0}")]
+    MissingCacheField(&'static str),
+
+    #[error("Invalid cache field: cache.{0}")]
+    InvalidCacheField(&'static str),
 }
 
 #[derive(Debug, Clone, Copy, serde::Deserialize)]
@@ -83,6 +89,9 @@ pub struct ParsedConfig {
 
     #[serde(default)]
     pub extractors: HashMap<String, HashMap<String, String>>,
+
+    #[serde(default)]
+    pub cache: HashMap<crate::cache::storage::CacheName, HashMap<String, String>>,
 }
 
 #[rustfmt::skip]

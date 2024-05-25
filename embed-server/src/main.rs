@@ -9,6 +9,12 @@
 #[macro_use]
 extern crate serde;
 
+#[cfg(not(feature = "sonic_json"))]
+extern crate serde_json as json_impl;
+
+#[cfg(feature = "sonic_json")]
+extern crate sonic_rs as json_impl;
+
 #[macro_use]
 extern crate tracing;
 

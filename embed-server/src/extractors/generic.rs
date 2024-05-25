@@ -222,7 +222,7 @@ pub async fn fetch_oembed<'a>(
     let body = state.client.get(&*link.url).send().await?.bytes().await?;
 
     Ok(Some(match link.format {
-        OEmbedFormat::JSON => serde_json::de::from_slice(&body)?,
+        OEmbedFormat::JSON => json_impl::from_slice(&body)?,
         OEmbedFormat::XML => quick_xml::de::from_reader(&*body)?,
     }))
 }

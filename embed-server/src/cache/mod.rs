@@ -57,10 +57,14 @@ impl EmbedCache {
         }
     }
 
+    pub fn add_storage(&mut self, storage: Cache) {
+        self.storage.push(storage);
+    }
+
     async fn get_tiered(&self, key: Bytes, now: Timestamp) -> Result<Option<CachedEmbed>, Error> {
         // explore cache storages in order
         for i in 0..self.storage.len() {
-            if let Some(embed) = self.storage[i].get(now, &key).await? {
+            if let Some(embed) = self.storage[i].get(now, key.clone()).await? {
                 // backpropagate to previous storages in reverse order
                 // so that the highest priority storage is the most recently updated
                 for j in (0..i).rev() {
