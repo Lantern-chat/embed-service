@@ -35,6 +35,13 @@ skip_oembed = [
     '''fxtwitter\.com$''', # gives more generic information than the meta tags, so should be avoided
 ]
 
+# When querying the cache, cache storage backends are queried in order from first declared to last.
+[cache.redb]
+path = "test.redb"
+
+[cache.sqlite]
+path = "test.db3"
+
 # The % prefix is just convention at this point, these are just string literal keys
 [user_agents]
 "%browser" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/111.0"

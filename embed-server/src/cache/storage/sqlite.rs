@@ -77,26 +77,8 @@ impl SqliteCache {
 
         Ok(())
     }
-}
 
-impl CacheStorage for SqliteCache {
-    async fn get(&self, now: Timestamp, key: Bytes) -> Result<Option<CachedEmbed>, Error> {
-        let this = self.clone();
-
-        tokio::task::spawn_blocking(move || this.get_blocking(now, key))
-            .await
-            .expect("Unable to spawn blocking task")
-    }
-
-    async fn put(&self, now: Timestamp, key: Bytes, value: CachedEmbed) -> Result<(), Error> {
-        let this = self.clone();
-
-        tokio::task::spawn_blocking(move || this.put_blocking(now, key, value))
-            .await
-            .expect("Unable to spawn blocking task")
-    }
-
-    async fn del(&self, key: Bytes) -> Result<(), Error> {
+    fn del_blocking(&self, key: Bytes) -> Result<(), Error> {
         let hash = blake3::hash(key.as_ref());
 
         self.pool.get()?.execute(
@@ -105,5 +87,31 @@ impl CacheStorage for SqliteCache {
         )?;
 
         Ok(())
+    }
+}
+
+impl CacheStorage for SqliteCache {
+    async fn get(&self, now: Timestamp, key: Bytes) -> Result<Option<CachedEmbed>, Error> {
+        let this = self.clone();
+
+        tokio::task::spawn_blocking(move || this.get_blocking(now, key))
+            .await
+            .expect("Unable to execute blocking task")
+    }
+
+    async fn put(&self, now: Timestamp, key: Bytes, value: CachedEmbed) -> Result<(), Error> {
+        let this = self.clone();
+
+        tokio::task::spawn_blocking(move || this.put_blocking(now, key, value))
+            .await
+            .expect("Unable to execute blocking task")
+    }
+
+    async fn del(&self, key: Bytes) -> Result<(), Error> {
+        let this = self.clone();
+
+        tokio::task::spawn_blocking(move || this.del_blocking(key))
+            .await
+            .expect("Unable to execute blocking task")
     }
 }
