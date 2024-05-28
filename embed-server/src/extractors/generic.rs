@@ -111,7 +111,10 @@ impl Extractor for GenericExtractor {
                 let mut body = Vec::with_capacity(max.min(512));
 
                 if let Ok(_) = read_bytes(&mut resp, &mut body, max).await {
-                    if let Ok(feed) = feed_rs::parser::parse_with_uri(&*body, Some(url.as_str())) {
+                    // TODO: Maybe set the timestamp parser to use iso8601_timestamp
+                    let parser = feed_rs::parser::Builder::new().base_uri(Some(url.as_str())).build();
+
+                    if let Ok(feed) = parser.parse(&*body) {
                         max_age = Some(crate::parser::feed::feed_into_embed(&mut embed, feed));
                     }
                 }
