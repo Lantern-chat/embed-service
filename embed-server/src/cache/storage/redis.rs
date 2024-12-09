@@ -1,17 +1,16 @@
-use embed::Timestamp;
 use hashbrown::HashMap;
 
 use fred::{
     interfaces::KeysInterface as _,
-    types::{Expiration, RedisConfig},
+    types::{config::Config, Expiration},
 };
 
 use crate::config::ConfigError;
 
-use super::{Bytes, Cache, CacheFactory, CacheStorage, CachedEmbed, Error};
+use super::{Bytes, Cache, CacheFactory, CacheStorage, CachedEmbed, Error, Timestamp};
 
 pub struct RedisCache {
-    client: fred::clients::RedisClient,
+    client: fred::clients::Client,
 }
 
 impl CacheFactory for RedisCache {
@@ -20,7 +19,7 @@ impl CacheFactory for RedisCache {
             return Err(Error::ConfigError(ConfigError::MissingCacheField("redis.url")));
         };
 
-        let client = fred::clients::RedisClient::new(RedisConfig::from_url(url)?, None, None, None);
+        let client = fred::clients::Client::new(Config::from_url(url)?, None, None, None);
 
         Ok(Cache::Redis(RedisCache { client }))
     }
@@ -45,13 +44,13 @@ impl CacheStorage for RedisCache {
         let json = json_impl::to_string(&value)?;
         let expires = value.0.duration_since(Timestamp::UNIX_EPOCH).whole_milliseconds() as i64;
 
-        self.client.set(key, json, Some(Expiration::PXAT(expires)), None, false).await?;
+        self.client.set::<(), _, _>(key, json, Some(Expiration::PXAT(expires)), None, false).await?;
 
         Ok(())
     }
 
     async fn del(&self, key: Bytes) -> Result<(), Error> {
-        self.client.del(key).await?;
+        self.client.del::<(), _>(key).await?;
 
         Ok(())
     }

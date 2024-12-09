@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use smol_str::SmolStr;
 
 use embed::*;
+use thin_str::ThinString;
 
 use super::html::{Header, LinkType, MetaProperty, Scope};
 use super::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
@@ -102,15 +103,18 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
     for header in headers {
         match header {
             Header::Meta(meta) => {
-                let raw_content = || SmolStr::from(meta.content.as_ref());
-                let content = || Some(SmolStr::from(meta.content.as_ref()));
+                #[rustfmt::skip]
+                macro_rules! raw_content { () => { From::from(meta.content.as_ref()) }; }
+                #[rustfmt::skip]
+                macro_rules! content { () => { Some(From::from(meta.content.as_ref())) }; }
+
                 let content_int = || meta.content.parse().ok();
 
                 match &*meta.property {
                     // special property for <title></title> values
                     "" if meta.pty == MetaProperty::Title => {
                         if embed.title.is_none() {
-                            embed.title = content();
+                            embed.title = content!();
                         }
                     }
 
@@ -118,36 +122,36 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                         embed.description = Some(crate::util::trim_text(&meta.content).into());
                     }
                     "theme-color" | "msapplication-TileColor" => embed.color = parse_color(&meta.content),
-                    "og:site_name" => embed.provider.name = content(),
+                    "og:site_name" => embed.provider.name = content!(),
                     // TODO: This isn't quite correct, but good enough most of the time
-                    "og:url" => embed.canonical = content(),
-                    "title" | "og:title" | "twitter:title" => embed.title = content(),
+                    "og:url" => embed.canonical = content!(),
+                    "title" | "og:title" | "twitter:title" => embed.title = content!(),
 
                     // YouTube uses this schema at least
                     "name"
                         if meta.pty == MetaProperty::ItemProp
                             && is_scope(&meta.scope, PossibleScopes::Author) =>
                     {
-                        get!(author).name = raw_content();
+                        get!(author).name = raw_content!();
                     }
                     "url"
                         if meta.pty == MetaProperty::ItemProp
                             && is_scope(&meta.scope, PossibleScopes::Author) =>
                     {
-                        get!(author).url = content();
+                        get!(author).url = content!();
                     }
-                    "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content(),
+                    "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content!(),
 
                     // don't let the twitter image overwrite og images
                     "twitter:image" => match embed.img {
-                        Some(ref mut image) if image.url.is_empty() => image.url = raw_content(),
-                        None => get!(img).url = raw_content(),
+                        Some(ref mut image) if image.url.is_empty() => image.url = raw_content!(),
+                        None => get!(img).url = raw_content!(),
                         _ => {}
                     },
 
-                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content(),
-                    "og:video" | "og:video:url" | "og:video:secure_url" => get!(video).url = raw_content(),
-                    "og:audio" | "og:audio:url" | "og:audio:secure_url" => get!(audio).url = raw_content(),
+                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content!(),
+                    "og:video" | "og:video:url" | "og:video:secure_url" => get!(video).url = raw_content!(),
+                    "og:audio" | "og:audio:url" | "og:audio:secure_url" => get!(audio).url = raw_content!(),
 
                     "og:image:width" => get!(img).width = content_int(),
                     "og:video:width" => get!(video).width = content_int(),
@@ -156,13 +160,13 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "og:image:height" => get!(img).height = content_int(),
                     "og:video:height" => get!(video).height = content_int(),
 
-                    "og:image:type" => get!(img).mime = content(),
-                    "og:video:type" => get!(video).mime = content(),
-                    "og:audio:type" => get!(audio).mime = content(),
+                    "og:image:type" => get!(img).mime = content!(),
+                    "og:video:type" => get!(video).mime = content!(),
+                    "og:audio:type" => get!(audio).mime = content!(),
 
-                    "og:image:alt" => get!(img).description = content(),
-                    "og:video:alt" => get!(video).description = content(),
-                    "og:audio:alt" => get!(audio).description = content(),
+                    "og:image:alt" => get!(img).description = content!(),
+                    "og:video:alt" => get!(video).description = content!(),
+                    "og:audio:alt" => get!(audio).description = content!(),
 
                     "og:ttl" => match content_int() {
                         None => {}
@@ -286,7 +290,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 }
 
 pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
-    let mut check_type = |media: &Option<BoxedEmbedMedia>, ty: EmbedType| {
+    let mut check_type = |media: &Option<Box<EmbedMedia>>, ty: EmbedType| {
         if !EmbedMedia::is_empty(media) {
             embed.ty = ty;
         } else if embed.ty == ty {
@@ -317,11 +321,7 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, mut o: OEmbed) -> ExtraFields 
     }
 
     // oEmbed cannot be trusted, see Matrix Synapse issue 14708
-    o.visit_text_mut(|t| {
-        if let Cow::Owned(e) = html_escape::decode_html_entities(t.as_str()) {
-            *t = e.into();
-        }
-    });
+    o.decode_html_entities();
 
     let mut extra = ExtraFields::default();
 
@@ -342,7 +342,7 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, mut o: OEmbed) -> ExtraFields 
         }
     }
 
-    // QUIRK: Sometimes oEmebed returns a bad title
+    // QUIRK: Sometimes oEmbed returns a bad title
     // that's just a prefix of the meta tags title
     if let Some(title) = o.title {
         match embed.title {
@@ -392,7 +392,7 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, mut o: OEmbed) -> ExtraFields 
     }
 
     if let Some(thumbnail_url) = o.thumbnail_url {
-        let mut thumb = BoxedEmbedMedia::default();
+        let mut thumb = Box::<EmbedMedia>::default();
 
         thumb.url = thumbnail_url;
         thumb.width = o.thumbnail_width.map(|x| x.0 as _);
@@ -421,7 +421,7 @@ impl<T> OptionExt<T> for Option<T> {
     }
 }
 
-fn parse_embed_html_src(html: &str) -> Option<SmolStr> {
+fn parse_embed_html_src(html: &str) -> Option<ThinString> {
     let mut start = memchr::memmem::find(html.as_bytes(), b"src=\"http")?;
 
     // strip src=" prefix
@@ -433,7 +433,7 @@ fn parse_embed_html_src(html: &str) -> Option<SmolStr> {
 
     memchr::memmem::find(src.as_bytes(), b"://")?;
 
-    Some(SmolStr::from(src))
+    Some(From::from(src))
 }
 
 fn parse_embed_html_type(html: &str) -> Option<SmolStr> {
@@ -448,7 +448,7 @@ fn parse_embed_html_type(html: &str) -> Option<SmolStr> {
     // mime type e.g.: image/png
     memchr::memchr(b'/', ty.as_bytes())?;
 
-    Some(SmolStr::from(ty))
+    Some(From::from(ty))
 }
 
 #[cfg(test)]

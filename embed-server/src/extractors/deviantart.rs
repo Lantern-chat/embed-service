@@ -68,7 +68,8 @@ impl Extractor for DeviantArtExtractor {
 
         // oEmbed provides name/url
         embed.provider.icon = Some(
-            BoxedEmbedMedia::default().with_url("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico"),
+            Box::<EmbedMedia>::default()
+                .with_url("https://st.deviantart.net/eclipse/icons/da_favicon_v2.ico"),
         );
 
         // thumbnails are often unnecessary for DA

@@ -142,7 +142,7 @@ async fn fetch_single_id(
     }
 
     let mut main_embed =
-        BoxedEmbedMedia::default().with_url(file_url).with_dims(file.width as _, file.height as _);
+        Box::<EmbedMedia>::default().with_url(file_url).with_dims(file.width as _, file.height as _);
 
     if let Some(ext) = main_embed.url.split('.').last() {
         let mime = mime_guess::from_ext(ext).first();
@@ -257,15 +257,15 @@ async fn fetch_single_id(
 static E621_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e621"));
-    provider.url = Some(SmolStr::new_inline("https://e621.net"));
-    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e621.net/apple-touch-icon.png"));
+    provider.url = Some(ThinString::from("https://e621.net"));
+    provider.icon = Some(Box::<EmbedMedia>::default().with_url("https://e621.net/apple-touch-icon.png"));
     provider
 });
 
 static E926_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e926"));
-    provider.url = Some(SmolStr::new_inline("https://e926.net"));
-    provider.icon = Some(BoxedEmbedMedia::default().with_url("https://e926.net/apple-touch-icon.png"));
+    provider.url = Some(ThinString::from("https://e926.net"));
+    provider.icon = Some(Box::<EmbedMedia>::default().with_url("https://e926.net/apple-touch-icon.png"));
     provider
 });

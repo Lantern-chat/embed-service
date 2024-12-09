@@ -83,21 +83,21 @@ impl Extractor for WikipediaExtractor {
         }
 
         if let Some(ImagePage::Found { thumbnail, pageimage }) = image.query.pages.values().next() {
-            let mut media = BoxedEmbedMedia::default().with_url(&thumbnail.source);
+            let mut media =
+                Box::<EmbedMedia>::default().with_url(&thumbnail.source).with_description(pageimage);
 
             media.width = thumbnail.width;
             media.height = thumbnail.height;
-            media.description = Some(pageimage.into());
             embed.thumb = Some(media);
         }
 
-        embed.url = Some(smol_str::format_smolstr!("{origin}/wiki/{title}"));
+        embed.url = Some(format_thin_string!("{origin}/wiki/{title}"));
         embed.color = Some(0xFFFFFF); // white
 
         embed.provider.name = Some(SmolStr::new_inline("Wikipedia"));
         embed.provider.icon = Some(
-            BoxedEmbedMedia::default()
-                .with_url(smol_str::format_smolstr!("{origin}/static/favicon/wikipedia.ico")),
+            Box::<EmbedMedia>::default()
+                .with_url(format_thin_string!("{origin}/static/favicon/wikipedia.ico")),
         );
 
         // 4-hour expire
@@ -122,13 +122,13 @@ pub struct WikipediaTextQuery {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct WikipediaImageQuery {
-    pub pages: HashMap<SmolStr, ImagePage>,
+    pub pages: HashMap<ThinString, ImagePage>,
 }
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(untagged)]
 pub enum TextPage {
-    Found { title: SmolStr, extract: String },
+    Found { title: ThinString, extract: String },
     NotFound {},
 }
 

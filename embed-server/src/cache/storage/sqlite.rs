@@ -1,9 +1,8 @@
-use embed::Timestamp;
 use hashbrown::HashMap;
 
 use crate::config::ConfigError;
 
-use super::{Bytes, Cache, CacheFactory, CacheStorage, CachedEmbed, Error};
+use super::{Bytes, Cache, CacheFactory, CacheStorage, CachedEmbed, Error, Timestamp};
 
 #[derive(Debug, Clone)]
 pub struct SqliteCache {

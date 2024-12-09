@@ -14,7 +14,7 @@ extern crate serde_json as json_impl;
 extern crate sonic_rs as json_impl;
 
 #[macro_use]
-extern crate tracing;
+extern crate tracing as log;
 
 pub mod cache;
 pub mod config;
@@ -28,17 +28,17 @@ use config::Site;
 use error::Error;
 use state::ServiceState;
 
-use axum::{
-    body::Bytes,
-    extract::{Query, State},
-    http::StatusCode,
-    routing::post,
-    Json,
-};
+use bytes::Bytes;
+
+use ftl::body::Json;
+use ftl::extract::{query::Query, State};
+use ftl::http::StatusCode;
+
 use futures_util::FutureExt;
-use std::{borrow::Cow, net::SocketAddr, str::FromStr, sync::Arc};
-use tower_http::{catch_panic::CatchPanicLayer, trace::TraceLayer};
+use std::{borrow::Cow, net::SocketAddr, str::FromStr, sync::Arc, time::Duration};
 use triomphe::Arc as TArc;
+
+use ftl::serve::Server;
 
 use crate::error::CacheError;
 
@@ -51,7 +51,7 @@ async fn main() {
     }
 
     let config = {
-        let config_path = std::env::var("EMBEDW_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
+        let config_path = std::env::var("EMBED_CONFIG_PATH").unwrap_or_else(|_| "./config.toml".to_owned());
         let config_file = std::fs::read_to_string(config_path).expect("Unable to read config file");
         let parsed: config::ParsedConfig =
             toml::de::from_str(&config_file).expect("Unable to parse config file");
@@ -69,22 +69,45 @@ async fn main() {
     }
 
     let addr =
-        SocketAddr::from_str(&std::env::var("EMBEDS_BIND_ADDRESS").expect("EMBEDS_BIND_ADDRESS not found"))
+        SocketAddr::from_str(&std::env::var("EMBED_BIND_ADDRESS").expect("EMBED_BIND_ADDRESS not found"))
             .expect("Unable to parse bind address");
 
     info!(%addr, "Starting...");
 
-    axum::serve(
-        tokio::net::TcpListener::bind(addr).await.expect("Unable to bind to address"),
-        post(root)
-            .route_layer(CatchPanicLayer::new())
-            .with_state(state.clone())
-            .layer(TraceLayer::new_for_http())
-            .into_make_service(),
-    )
-    .with_graceful_shutdown(tokio::signal::ctrl_c().map(|_| ()))
-    .await
-    .expect("Unable to run embed-worker");
+    let mut server = Server::bind([addr]);
+
+    server.handle().set_shutdown_timeout(Duration::from_secs(1));
+    server.handle().shutdown_on(tokio::signal::ctrl_c().map(|_| ()));
+    server.http1().pipeline_flush(true);
+
+    let router = {
+        use ftl::{Response, Router};
+
+        let mut router = Router::<Arc<ServiceState>, Response>::with_state(state.clone());
+
+        router.post("/", root);
+        router.fallback(|| async { StatusCode::NOT_FOUND });
+
+        router
+    };
+
+    let service = {
+        use ftl::layers::{
+            catch_panic::CatchPanic, cloneable::Cloneable, convert_body::ConvertBody,
+            resp_timing::RespTimingLayer, Layer,
+        };
+
+        let layer_stack = (
+            RespTimingLayer::default(), // logs the time taken to process each request
+            CatchPanic::default(),      // spawns each request in a separate task and catches panics
+            Cloneable::default(),
+            ConvertBody::default(), // converts the body to the correct type
+        );
+
+        layer_stack.layer(router)
+    };
+
+    server.acceptor(ftl::serve::accept::NoDelayAcceptor).serve(service).await.expect("Server failed");
 
     info!("Shutting down...");
 
@@ -101,12 +124,11 @@ pub struct Params {
     pub lang: Option<String>,
 }
 
-#[instrument(skip(state))]
 async fn root(
     State(state): State<Arc<ServiceState>>,
     Query(params): Query<Params>,
     body: Bytes,
-) -> Result<Json<TArc<extractors::EmbedWithExpire>>, (StatusCode, Cow<'static, str>)> {
+) -> Result<Json<TArc<extractors::EmbedWithExpire>>, (Cow<'static, str>, StatusCode)> {
     let url = body; // to avoid confusion
 
     match inner(state, url, params).await {
@@ -121,7 +143,7 @@ async fn root(
                 Cow::Owned(e.to_string())
             };
 
-            (code, msg)
+            (msg, code)
         }),
     }
 }
@@ -134,6 +156,8 @@ async fn inner(
     use cache::{CacheHit, CacheState};
 
     let url = url::Url::parse(core::str::from_utf8(&orig_url).map_err(|_| Error::InvalidUrl)?)?;
+
+    info!(%url, "Request with params: {params:?}");
 
     let miss = match state.cache.get(&orig_url).await? {
         CacheHit::Hit(embed) => return Ok(embed),

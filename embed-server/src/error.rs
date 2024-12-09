@@ -1,5 +1,4 @@
-use embed::Timestamp;
-use iso8601_timestamp::Duration;
+use embed::timestamp::{Duration, Timestamp};
 use reqwest::StatusCode;
 use triomphe::Arc;
 
@@ -34,7 +33,7 @@ pub enum Error {
 
     #[cfg(feature = "cache_redis")]
     #[error("Redis Error: {0}")]
-    RedisError(#[from] fred::error::RedisError),
+    RedisError(#[from] fred::error::Error),
 
     #[cfg(feature = "cache_rusqlite")]
     #[error("SQLite Pool Error: {0}")]

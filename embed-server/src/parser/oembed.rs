@@ -75,7 +75,10 @@ pub enum OEmbedType {
 
 use std::borrow::Cow;
 
+use embed::thin_str::ThinString;
 use smol_str::SmolStr;
+
+use super::StringHelpers;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OEmbed {
@@ -85,28 +88,28 @@ pub struct OEmbed {
     pub kind: OEmbedType,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<SmolStr>,
+    pub title: Option<ThinString>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub author_name: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub author_url: Option<SmolStr>,
+    pub author_url: Option<ThinString>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_name: Option<SmolStr>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider_url: Option<SmolStr>,
+    pub provider_url: Option<ThinString>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cache_age: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thumbnail_url: Option<SmolStr>,
+    pub thumbnail_url: Option<ThinString>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thumbnail_width: Option<Integer64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thumbnail_height: Option<Integer64>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub url: Option<SmolStr>,
+    pub url: Option<ThinString>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub html: Option<SmolStr>,
+    pub html: Option<ThinString>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub width: Option<Integer64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -124,22 +127,11 @@ impl OEmbed {
         }
     }
 
-    pub fn visit_text_mut<F>(&mut self, mut f: F)
-    where
-        F: FnMut(&mut SmolStr),
-    {
-        fn visit_text_opt_mut<F>(text: &mut Option<SmolStr>, mut f: F)
-        where
-            F: FnMut(&mut SmolStr),
-        {
-            if let Some(ref mut value) = *text {
-                f(value);
-            }
-        }
-
-        visit_text_opt_mut(&mut self.title, &mut f);
-        visit_text_opt_mut(&mut self.author_name, &mut f);
-        visit_text_opt_mut(&mut self.provider_name, &mut f);
+    /// oEmbed cannot be trusted, see Matrix Synapse issue 14708
+    pub fn decode_html_entities(&mut self) {
+        self.title.decode_html_entities();
+        self.author_name.decode_html_entities();
+        self.author_url.decode_html_entities();
     }
 }
 

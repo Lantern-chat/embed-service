@@ -26,7 +26,7 @@ pub fn feed_into_embed(embed: &mut EmbedV1, feed: Feed) -> u64 {
 
 fn image_to_media(media: &mut EmbedMedia, image: Image) {
     media.url = image.uri.into();
-    media.description = image.title.or(image.description).map(SmolStr::from);
+    media.description = image.title.or(image.description).map(Into::into);
     media.width = image.width.map(|x| x as i32);
     media.height = image.height.map(|x| x as i32);
 }

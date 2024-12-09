@@ -142,9 +142,9 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
             Some(src) if kind != Kind::Unsupported => {
                 let use_thumbnail = node.value().has_class("submission-writing", AsciiCaseInsensitive);
 
-                let mut media = BoxedEmbedMedia::default().with_url(fix_relative_scheme(src));
+                let mut media = Box::<EmbedMedia>::default().with_url(fix_relative_scheme(src));
 
-                media.description = alt.map(SmolStr::new);
+                media.description = alt.map(ThinString::from);
 
                 match kind {
                     Kind::Image if use_thumbnail => embed.thumb = Some(media),
@@ -215,7 +215,7 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
     if let Some(node) = doc.select(selector!("img.submission-user-icon")).next() {
         if let Some(src) = node.value().attr("src") {
-            author.icon = Some(BoxedEmbedMedia::default().with_url(fix_relative_scheme(src)));
+            author.icon = Some(Box::<EmbedMedia>::default().with_url(fix_relative_scheme(src)));
         }
     }
 
@@ -239,9 +239,9 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
         let mut provider = EmbedProvider::default();
 
         provider.name = Some(SmolStr::new_inline("FurAffinity"));
-        provider.url = Some(SmolStr::new("https://www.furaffinity.net"));
+        provider.url = Some(ThinString::from("https://www.furaffinity.net"));
         provider.icon = Some(
-            BoxedEmbedMedia::default().with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"),
+            Box::<EmbedMedia>::default().with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"),
         );
 
         provider

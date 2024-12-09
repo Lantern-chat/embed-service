@@ -17,7 +17,7 @@ pub struct ServiceState {
     pub cache: EmbedCache,
 }
 
-use common::fixed::FixedStr;
+use embed::v1::UrlSignature;
 
 impl ServiceState {
     pub fn new(config: Config, signing_key: Option<String>) -> Self {
@@ -107,7 +107,7 @@ impl ServiceState {
         }
     }
 
-    pub fn sign(&self, value: &str) -> Option<FixedStr<27>> {
+    pub fn sign(&self, value: &str) -> Option<UrlSignature> {
         let key = self.signing_key.as_ref()?;
 
         use base64::engine::{general_purpose::URL_SAFE_NO_PAD, Engine};
@@ -116,7 +116,7 @@ impl ServiceState {
 
         let mut buf = [0; 27];
         if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
-            return Some(FixedStr::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
+            return Some(UrlSignature::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
         }
 
         None

@@ -36,3 +36,63 @@ pub fn trim_text(mut text: &str, max_len: usize) -> &str {
 
     text
 }
+
+use std::borrow::Cow;
+
+pub trait StringHelpers {
+    fn trim_text(&mut self, max_len: usize);
+    fn decode_html_entities(&mut self);
+}
+
+impl StringHelpers for String {
+    fn trim_text(&mut self, max_len: usize) {
+        *self = trim_text(self, max_len).to_owned();
+    }
+
+    fn decode_html_entities(&mut self) {
+        if let Cow::Owned(decoded) = html_escape::decode_html_entities(self) {
+            *self = decoded;
+        }
+    }
+}
+
+impl StringHelpers for smol_str::SmolStr {
+    fn trim_text(&mut self, max_len: usize) {
+        *self = trim_text(self, max_len).into();
+    }
+
+    fn decode_html_entities(&mut self) {
+        if let Cow::Owned(decoded) = html_escape::decode_html_entities(self) {
+            *self = decoded.into();
+        }
+    }
+}
+
+impl StringHelpers for ::embed::thin_str::ThinString {
+    fn trim_text(&mut self, max_len: usize) {
+        *self = trim_text(self, max_len).into();
+    }
+
+    fn decode_html_entities(&mut self) {
+        if let Cow::Owned(decoded) = html_escape::decode_html_entities(self) {
+            *self = decoded.into();
+        }
+    }
+}
+
+impl<T> StringHelpers for Option<T>
+where
+    T: StringHelpers,
+{
+    fn trim_text(&mut self, max_len: usize) {
+        if let Some(ref mut inner) = self {
+            inner.trim_text(max_len);
+        }
+    }
+
+    fn decode_html_entities(&mut self) {
+        if let Some(ref mut inner) = self {
+            inner.decode_html_entities();
+        }
+    }
+}

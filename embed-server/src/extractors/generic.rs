@@ -121,7 +121,7 @@ impl Extractor for GenericExtractor {
 
                 drop(body);
             } else {
-                let mut media = BoxedEmbedMedia::default();
+                let mut media = Box::<EmbedMedia>::default();
                 media.url = url.as_str().into();
                 media.mime = Some(mime.into());
 
@@ -190,12 +190,14 @@ impl Extractor for GenericExtractor {
 pub fn finalize_embed(state: Arc<ServiceState>, mut embed: EmbedV1, max_age: Option<u64>) -> EmbedWithExpire {
     crate::parser::quirks::fix_embed(&mut embed);
 
-    embed.visit_media(|media| {
-        media.signature = state.sign(&media.url);
-    });
+    if state.signing_key.is_some() {
+        embed.visit_media(|media| {
+            media.signature = state.sign(&media.url);
+        });
+    }
 
     let expires = {
-        use iso8601_timestamp::{Duration, Timestamp};
+        use embed::timestamp::{Duration, Timestamp};
 
         embed.ts = Timestamp::now_utc();
 
@@ -203,7 +205,7 @@ pub fn finalize_embed(state: Arc<ServiceState>, mut embed: EmbedV1, max_age: Opt
         embed
             .ts
             .checked_add(Duration::seconds(
-                max_age.unwrap_or(60 * 15).min(60 * 60 * 24 * 30).max(60 * 15) as i64,
+                max_age.unwrap_or(60 * 15).clamp(60 * 15, 60 * 60 * 24 * 30) as i64,
             ))
             .unwrap()
     };
@@ -211,9 +213,9 @@ pub fn finalize_embed(state: Arc<ServiceState>, mut embed: EmbedV1, max_age: Opt
     (expires, embed::Embed::V1(embed))
 }
 
-pub async fn fetch_oembed<'a>(
+pub async fn fetch_oembed(
     state: &ServiceState,
-    link: &OEmbedLink<'a>,
+    link: &OEmbedLink<'_>,
     domain: Option<&str>,
 ) -> Result<Option<OEmbed>, Error> {
     if let Some(domain) = domain {

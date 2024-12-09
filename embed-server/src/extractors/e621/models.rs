@@ -1,3 +1,4 @@
+use ::embed::thin_str::ThinString;
 use hashbrown::HashMap;
 use heck::ToTitleCase;
 use smol_str::SmolStr;
@@ -39,7 +40,7 @@ pub struct Post {
     #[serde(default)]
     pub sample: Option<Sample>,
     pub rating: Rating,
-    pub description: SmolStr,
+    pub description: ThinString,
     pub tags: Tags,
 }
 

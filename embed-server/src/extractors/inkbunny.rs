@@ -140,7 +140,7 @@ impl Extractor for InkbunnyExtractor {
 
         if !submission.files.is_empty() {
             embed.footer = Some(EmbedFooter {
-                text: smol_str::format_smolstr!(
+                text: format_thin_string!(
                     "and {} more {}",
                     submission.files.len(),
                     match submission.files.len() {
@@ -153,7 +153,7 @@ impl Extractor for InkbunnyExtractor {
         }
 
         if kind != Kind::Text {
-            let mut media = BoxedEmbedMedia::default();
+            let mut media = Box::<EmbedMedia>::default();
 
             media.mime = file.mimetype;
 
@@ -184,7 +184,7 @@ impl Extractor for InkbunnyExtractor {
 
         if let Some(thumb_url) = file.thumbnail_url_huge {
             embed.thumb = Some({
-                let mut media = BoxedEmbedMedia::default();
+                let mut media = Box::<EmbedMedia>::default();
                 media.url = thumb_url;
                 media.width = file.thumb_huge_x.map(|x| x.0 as _);
                 media.height = file.thumb_huge_y.map(|x| x.0 as _);
@@ -194,18 +194,18 @@ impl Extractor for InkbunnyExtractor {
 
         embed.color = Some(0x73d216);
         embed.provider.name = Some(SmolStr::new_inline("Inkbunny"));
-        embed.provider.url = Some(SmolStr::new_inline("https://inkbunny.net"));
+        embed.provider.url = Some(ThinString::from("https://inkbunny.net"));
         embed.provider.icon =
-            Some(BoxedEmbedMedia::default().with_url("https://va.ib.metapix.net/images80/favicon.ico"));
+            Some(Box::<EmbedMedia>::default().with_url("https://va.ib.metapix.net/images80/favicon.ico"));
 
         embed.author = Some({
             let mut author = EmbedAuthor::default();
             if let Some(icon) = submission.user_icon_url_small {
-                author.icon = BoxedEmbedMedia::default().with_url(icon).into();
+                author.icon = Box::<EmbedMedia>::default().with_url(icon).into();
             }
 
             author.name = submission.username;
-            author.url = Some(smol_str::format_smolstr!("https://inkbunny.net/{}", author.name));
+            author.url = Some(format_thin_string!("https://inkbunny.net/{}", author.name));
 
             author
         });
@@ -251,12 +251,12 @@ pub struct InkbunnySubmission {
     pub username: SmolStr,
 
     #[serde(default)]
-    pub title: Option<SmolStr>,
+    pub title: Option<ThinString>,
     #[serde(default)]
-    pub description: Option<SmolStr>,
+    pub description: Option<ThinString>,
 
     #[serde(default)]
-    pub user_icon_url_small: Option<SmolStr>,
+    pub user_icon_url_small: Option<ThinString>,
 
     #[serde(default)]
     pub files: VecDeque<InkbunnyFile>,
@@ -267,24 +267,24 @@ pub struct InkbunnySubmission {
 #[derive(Debug, serde::Deserialize)]
 pub struct InkbunnyFile {
     #[serde(default)]
-    pub file_name: Option<SmolStr>,
+    pub file_name: Option<ThinString>,
     #[serde(default)]
     pub mimetype: Option<SmolStr>,
 
-    pub file_url_full: SmolStr,
+    pub file_url_full: ThinString,
     #[serde(default)]
     pub full_size_x: Option<Integer64>,
     #[serde(default)]
     pub full_size_y: Option<Integer64>,
 
-    pub file_url_screen: SmolStr,
+    pub file_url_screen: ThinString,
     #[serde(default)]
     pub screen_size_x: Option<Integer64>,
     #[serde(default)]
     pub screen_size_y: Option<Integer64>,
 
     #[serde(default)]
-    pub thumbnail_url_huge: Option<SmolStr>,
+    pub thumbnail_url_huge: Option<ThinString>,
     #[serde(default)]
     pub thumb_huge_x: Option<Integer64>,
     #[serde(default)]

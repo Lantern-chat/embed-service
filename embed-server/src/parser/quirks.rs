@@ -2,6 +2,8 @@ use embed::*;
 
 use url::Url;
 
+use super::StringHelpers;
+
 pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
     embed.visit_media(|media| {
         // assume these are well-formed
@@ -39,23 +41,9 @@ pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
 
         media.url = match new_url {
             Ok(url) => url.as_str().into(),
-            Err(_) => SmolStr::default(),
+            Err(_) => Default::default(),
         };
     });
-}
-
-fn trim_text(text: &mut SmolStr, max_len: usize) {
-    let trimmed = super::trim_text(text, max_len);
-
-    if trimmed.len() < text.len() {
-        *text = trimmed.into();
-    }
-}
-
-fn maybe_trim_text(text: &mut Option<SmolStr>, max_len: usize) {
-    if let Some(ref mut text) = text {
-        trim_text(text, max_len);
-    }
 }
 
 pub fn fix_embed(embed: &mut EmbedV1) {
@@ -144,15 +132,15 @@ pub fn fix_embed(embed: &mut EmbedV1) {
     embed.visit_full_media(EmbedMedia::normalize);
 
     embed.visit_media(|media| {
-        maybe_trim_text(&mut media.description, 512);
+        media.description.trim_text(512);
     });
 
-    maybe_trim_text(&mut embed.title, 1024);
-    maybe_trim_text(&mut embed.description, 2048);
-    maybe_trim_text(&mut embed.provider.name, 196);
+    embed.title.trim_text(1024);
+    embed.description.trim_text(2048);
+    embed.provider.name.trim_text(196);
 
     if let Some(ref mut author) = embed.author {
-        trim_text(&mut author.name, 196);
+        author.name.trim_text(196);
     }
 
     super::embed::determine_embed_type(embed);

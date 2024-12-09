@@ -118,7 +118,7 @@ impl Extractor for ImgurExtractor {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
-        let mut media = BoxedEmbedMedia::default();
+        let mut media = Box::<EmbedMedia>::default();
 
         // add ?noredirect to imgur links because they're annoying
         media.url = add_noredirect(std::mem::take(&mut image.link)).into();
@@ -152,9 +152,9 @@ impl Extractor for ImgurExtractor {
             let mut provider = EmbedProvider::default();
 
             provider.name = Some(SmolStr::new_inline("imgur"));
-            provider.url = Some(SmolStr::new_inline("https://imgur.com"));
+            provider.url = Some(ThinString::from("https://imgur.com"));
             provider.icon =
-                Some(BoxedEmbedMedia::default().with_url("https://s.imgur.com/images/favicon.png"));
+                Some(Box::<EmbedMedia>::default().with_url("https://s.imgur.com/images/favicon.png"));
 
             provider
         });
@@ -183,7 +183,7 @@ impl Extractor for ImgurExtractor {
         if data.images_count > 1 {
             let rem = data.images_count - 1;
             embed.footer = Some(EmbedFooter {
-                text: smol_str::format_smolstr!(
+                text: format_thin_string!(
                     "and {rem} more {}",
                     match rem {
                         1 => "file",
@@ -226,10 +226,10 @@ pub struct ImgurData {
     pub cover: Option<SmolStr>,
 
     #[serde(default)]
-    pub title: Option<SmolStr>,
+    pub title: Option<ThinString>,
 
     #[serde(default)]
-    pub description: Option<SmolStr>,
+    pub description: Option<ThinString>,
 
     #[serde(default)]
     pub nsfw: Option<bool>,

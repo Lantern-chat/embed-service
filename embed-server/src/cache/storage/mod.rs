@@ -1,5 +1,5 @@
-use axum::body::Bytes;
-use embed::{EmbedWithExpire, Timestamp};
+use bytes::Bytes;
+use embed::{timestamp::Timestamp, EmbedWithExpire};
 use hashbrown::HashMap;
 use triomphe::Arc;
 

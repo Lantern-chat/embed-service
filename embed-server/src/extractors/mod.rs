@@ -1,10 +1,11 @@
 #![allow(unused)]
 
+use std::sync::Arc;
+
 use crate::{
     config::{Config, ConfigError},
     Error, Params, ServiceState,
 };
-use std::sync::Arc;
 
 use url::Url;
 
@@ -32,17 +33,29 @@ pub trait Extractor: Send + Sync + std::fmt::Debug {
     ) -> Result<EmbedWithExpire, Error>;
 }
 
+macro_rules! format_thin_string {
+    ($($arg:tt)*) => {{
+        use ::core::fmt::Write;
+        let mut s = ::embed::thin_str::ThinString::new();
+        write!(s, $($arg)*).unwrap();
+        s
+    }};
+}
+
 mod prelude {
     pub use std::fmt::Write;
     pub use std::sync::Arc;
 
     pub use crate::parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
+
     pub use futures_util::future::FutureExt;
     pub use once_cell::sync::Lazy;
     pub use reqwest::{
         header::{HeaderName, HeaderValue},
         Method, StatusCode,
     };
+
+    pub use ::embed::thin_str::ThinString;
     pub use smol_str::{SmolStr, ToSmolStr};
     pub use url::Url;
 

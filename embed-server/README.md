@@ -12,7 +12,7 @@ If `signed = true` (default), a signing key is required somewhere in the environ
 
 128-bit media-url signing key encoded as a hexadecimal string. For Lantern, this is used to verify media URLs when they are proxied through our camo-worker.
 
-#### `EMBEDS_BIND_ADDRESS`
+#### `EMBED_BIND_ADDRESS`
 
 IP Address for the microservice to bind to.
 
@@ -25,7 +25,7 @@ You may also append a `?lang=en-US` (example) query parameter to the request URI
 ### Example
 
 ```bash
-EMBEDS_BIND_ADDRESS="127.0.0.1:8050" cargo run
+EMBED_BIND_ADDRESS="127.0.0.1:8050" cargo run
 
 curl --request POST \
   --url http://localhost:8050/ \

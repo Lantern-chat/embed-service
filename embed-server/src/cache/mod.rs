@@ -1,5 +1,5 @@
-use axum::body::Bytes;
-use embed::{EmbedWithExpire, Timestamp};
+use bytes::Bytes;
+use embed::{timestamp::Timestamp, EmbedWithExpire};
 use futures_util::StreamExt;
 use scc::hash_cache::Entry as CacheEntry;
 use tokio::sync::watch::{self, Receiver, Sender};
@@ -193,7 +193,7 @@ impl EmbedCache {
                     }
                 };
 
-                // explicitely unlock the bucket, despite not actually inserting anything
+                // explicitly unlock the bucket, despite not actually inserting anything
                 drop(vac);
 
                 tracing::debug!("Cache miss: {:?}", key.clone());

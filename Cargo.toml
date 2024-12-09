@@ -3,5 +3,7 @@ members = ["embed-sdk", "embed-server"]
 resolver = "2"
 
 [patch.crates-io]
-rkyv = { git = "https://github.com/Lantern-chat/rkyv", branch = "0.7" }
+postgres-types = { git = "https://github.com/Lantern-chat/rust-postgres" }
+schemars = { git = "https://github.com/Lantern-chat/schemars" }
+# rkyv = { git = "https://github.com/rkyv/rkyv" }
 
