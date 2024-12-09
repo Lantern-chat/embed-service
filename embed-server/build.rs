@@ -23,13 +23,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )",
         &mut file,
     )?;
-    regex_build::write_regex(
-        "ADULT_RATING", // case-insensitive rating
-        r"(?i)(?-u)adult|mature|RTA\-5042\-1996\-1400\-1577\-RTA",
-        &mut file,
-    )?;
-
-    regex_build::write_regex("NEWLINES", r"(\r?\n){3,}", &mut file)?;
 
     Ok(())
 }

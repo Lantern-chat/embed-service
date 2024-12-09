@@ -2,6 +2,7 @@ pub mod embed;
 pub mod feed;
 pub mod html;
 pub mod oembed;
+pub mod patterns;
 pub mod quirks;
 pub mod utils;
 
@@ -40,11 +41,17 @@ pub fn trim_text(mut text: &str, max_len: usize) -> &str {
 use std::borrow::Cow;
 
 pub trait StringHelpers {
+    fn is_empty(&self) -> bool;
+
     fn trim_text(&mut self, max_len: usize);
     fn decode_html_entities(&mut self);
 }
 
 impl StringHelpers for String {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
     fn trim_text(&mut self, max_len: usize) {
         *self = trim_text(self, max_len).to_owned();
     }
@@ -57,6 +64,10 @@ impl StringHelpers for String {
 }
 
 impl StringHelpers for smol_str::SmolStr {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
     fn trim_text(&mut self, max_len: usize) {
         *self = trim_text(self, max_len).into();
     }
@@ -69,6 +80,10 @@ impl StringHelpers for smol_str::SmolStr {
 }
 
 impl StringHelpers for ::embed::thin_str::ThinString {
+    fn is_empty(&self) -> bool {
+        self.is_empty()
+    }
+
     fn trim_text(&mut self, max_len: usize) {
         *self = trim_text(self, max_len).into();
     }
@@ -84,9 +99,20 @@ impl<T> StringHelpers for Option<T>
 where
     T: StringHelpers,
 {
+    fn is_empty(&self) -> bool {
+        match self {
+            Some(inner) => inner.is_empty(),
+            None => true,
+        }
+    }
+
     fn trim_text(&mut self, max_len: usize) {
         if let Some(ref mut inner) = self {
             inner.trim_text(max_len);
+
+            if inner.is_empty() {
+                *self = None;
+            }
         }
     }
 

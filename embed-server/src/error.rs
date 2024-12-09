@@ -49,6 +49,7 @@ pub enum Error {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[must_use]
 #[error("{error}")]
 pub struct CacheError {
     pub error: Error,
@@ -56,6 +57,7 @@ pub struct CacheError {
 }
 
 impl Error {
+    #[must_use]
     pub fn status_code(&self) -> StatusCode {
         match self {
             Error::ConfigError(_) => StatusCode::INTERNAL_SERVER_ERROR,

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use smol_str::SmolStr;
 
 use embed::*;
@@ -307,7 +305,7 @@ pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
 
 pub fn parse_rating(embed: &mut EmbedV1, rating: &str) {
     // NOTE: In case of multiple tags, this is additive
-    if super::regexes::ADULT_RATING.is_match(rating.as_bytes()) {
+    if crate::parser::patterns::contains_adult_rating(rating.as_bytes()) {
         embed.flags |= EmbedFlags::ADULT;
     }
 }

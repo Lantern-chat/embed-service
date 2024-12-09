@@ -24,27 +24,64 @@ where
     Ok(())
 }
 
+/// Removes redundant newlines from the text,
+/// collapsing multiple newlines into a maximum of two.
+///
+/// This also removes carriage returns and trims any leading/trailing whitespace,
+/// trying not to allocate as best as possible.
 pub fn trim_text(text: &str) -> Cow<str> {
     let mut trimmed = Cow::Borrowed(text.trim());
 
-    if !trimmed.is_empty() {
-        let mut new_text = String::new();
-        let mut idx = 0;
+    if trimmed.is_empty() {
+        return trimmed;
+    }
 
-        for (start, end) in crate::parser::regexes::NEWLINES.find_iter(trimmed.as_bytes()) {
-            new_text.push_str(&trimmed[idx..start]);
-            new_text.push_str("\n\n");
-            idx = end;
+    let mut new_text = String::new();
+
+    let mut chars = trimmed.char_indices();
+
+    let mut last_idx = 0;
+
+    // collapse multiple newlines into one or two
+    while let Some((start_idx, c)) = chars.next() {
+        let mut cnt = match c {
+            '\r' => 0,
+            '\n' => 1,
+            _ => continue,
+        };
+
+        let mut end_idx = start_idx;
+
+        // scan ahead to the end of the newline sequence
+        for (idx, c) in chars.by_ref() {
+            match c {
+                '\r' => end_idx = idx,
+                '\n' => {
+                    cnt += 1;
+                    end_idx = idx;
+                }
+                _ => break,
+            }
         }
 
-        if idx != 0 {
-            new_text.push_str(&trimmed[idx..]);
-
-            // trim any ending whitespace
-            new_text.truncate(new_text.trim_end().len());
-
-            trimmed = new_text.into();
+        // up to two plain newlines are allowed as-is
+        if cnt <= 2 && (end_idx - start_idx + 1) == cnt {
+            continue;
         }
+
+        new_text.push_str(&trimmed[last_idx..start_idx]);
+        last_idx = end_idx + 1;
+
+        new_text.push_str(match cnt {
+            1 => "\n",
+            _ => "\n\n",
+        })
+    }
+
+    if last_idx != 0 {
+        new_text.push_str(trimmed[last_idx..].trim_end());
+
+        trimmed = new_text.into();
     }
 
     trimmed

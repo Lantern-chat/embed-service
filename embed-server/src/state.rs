@@ -9,6 +9,7 @@ pub type Hmac = hmac::SimpleHmac<sha1::Sha1>;
 
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 
+#[must_use]
 pub struct ServiceState {
     pub config: Config,
     pub signing_key: Option<Key<Hmac>>,
@@ -116,6 +117,7 @@ impl ServiceState {
 
         let mut buf = [0; 27];
         if let Ok(27) = URL_SAFE_NO_PAD.encode_slice(sig, &mut buf) {
+            // SAFETY: the base64 encoding is guaranteed to be valid utf8
             return Some(UrlSignature::new(unsafe { std::str::from_utf8_unchecked(&buf) }));
         }
 

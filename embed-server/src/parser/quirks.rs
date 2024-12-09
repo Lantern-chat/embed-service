@@ -118,12 +118,16 @@ pub fn fix_embed(embed: &mut EmbedV1) {
     }
 
     // Avoid alt-text that's the same as the description
-    if embed.description.is_some() {
-        // NOTE: SmolStr uses an Arc internally, so cloning is cheap
-        let desc = embed.description.clone();
+    if let Some(ref desc) = embed.description {
+        // cloning the description just to allow another mutable borrow of embed
+        // is very wasteful, so we're going to cheat.
+        //
+        // SAFETY: This ref doesn't outlive this block, and we can guarantee that
+        // the embed.description is never modified.
+        let never_do_this = unsafe { core::mem::transmute::<&str, &'static str>(desc.as_str()) };
 
         embed.visit_media(|media| {
-            if media.description == desc {
+            if matches!(media.description, Some(ref d) if d == never_do_this) {
                 media.description = None;
             }
         });

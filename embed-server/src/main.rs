@@ -1,7 +1,17 @@
+#![doc = include_str!("../README.md")]
 #![allow(
     clippy::redundant_pattern_matching,
     clippy::field_reassign_with_default,
     clippy::large_enum_variant
+)]
+#![deny(
+    //missing_docs,
+    clippy::missing_safety_doc,
+    clippy::undocumented_unsafe_blocks,
+    //clippy::must_use_candidate,
+    clippy::perf,
+    clippy::complexity,
+    clippy::suspicious
 )]
 
 #[macro_use]

@@ -56,6 +56,7 @@ mod prelude {
     };
 
     pub use ::embed::thin_str::ThinString;
+    pub use ::embed::timestamp::Timestamp;
     pub use smol_str::{SmolStr, ToSmolStr};
     pub use url::Url;
 

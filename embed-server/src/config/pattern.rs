@@ -23,7 +23,7 @@ impl<'de> Deserialize<'de> for Pattern {
 
         struct Visitor;
 
-        impl<'de> de::Visitor<'de> for Visitor {
+        impl de::Visitor<'_> for Visitor {
             type Value = Pattern;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {

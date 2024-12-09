@@ -16,7 +16,7 @@ pub fn feed_into_embed(embed: &mut EmbedV1, feed: Feed) -> u64 {
 
     if let Some(ref rating) = feed.rating {
         // TODO: I don't know exactly what this field can contain
-        if crate::parser::regexes::ADULT_RATING.is_match(rating.value.as_bytes()) {
+        if crate::parser::patterns::contains_adult_rating(rating.value.as_bytes()) {
             embed.flags |= EmbedFlags::ADULT;
         }
     }

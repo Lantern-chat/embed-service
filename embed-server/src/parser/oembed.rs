@@ -161,7 +161,7 @@ const _: () = {
 
             struct Visitor;
 
-            impl<'de> de::Visitor<'de> for Visitor {
+            impl de::Visitor<'_> for Visitor {
                 type Value = OEmbedVersion1;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -242,7 +242,7 @@ const _: () = {
 
             struct Visitor;
 
-            impl<'de> de::Visitor<'de> for Visitor {
+            impl de::Visitor<'_> for Visitor {
                 type Value = Integer64;
 
                 fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
