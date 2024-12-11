@@ -9,6 +9,202 @@ impl ExtractorFactory for GenericExtractor {
     }
 }
 
+/// Extracts an embed from a URL using generic/standard attributes
+pub async fn extract(
+    state: Arc<ServiceState>,
+    url: url::Url,
+    params: Params,
+) -> Result<EmbedWithExpire, Error> {
+    let RawGenericExtraction {
+        state,
+        embed,
+        max_age,
+    } = extract_raw(state, url, params).await?;
+
+    Ok(finalize_embed(state, embed, max_age))
+}
+
+pub struct RawGenericExtraction {
+    pub state: Arc<ServiceState>,
+    pub embed: EmbedV1,
+    pub max_age: Option<u64>,
+}
+
+/// Extracts an embed from a URL using generic/standard attributes,
+/// but doesn't finalize it
+pub async fn extract_raw(
+    state: Arc<ServiceState>,
+    url: url::Url,
+    params: Params,
+) -> Result<RawGenericExtraction, Error> {
+    if !url.scheme().starts_with("http") {
+        return Err(Error::InvalidUrl);
+    }
+
+    let site = url.domain().and_then(|domain| state.config.find_site(domain));
+
+    let mut resp = retry_request(2, || {
+        let mut req = state.client.get(url.as_str());
+
+        if let Some(ref site) = site {
+            req = site.add_headers(&state.config, req);
+        }
+
+        if let Some(ref lang) = params.lang {
+            req = req.header(
+                HeaderName::from_static("accept-language"),
+                format!("{lang};q=0.5"),
+            );
+        }
+
+        req
+    })
+    .await?;
+
+    if !resp.status().is_success() {
+        return Err(Error::Failure(resp.status()));
+    }
+
+    let mut embed = EmbedV1::default();
+    let mut oembed: Option<OEmbed> = None;
+
+    // seconds until embed expires
+    let mut max_age = None;
+
+    if let Some(rating) = resp.headers().get(HeaderName::from_static("rating")) {
+        if crate::parser::patterns::contains_adult_rating(rating.as_bytes()) {
+            embed.flags |= EmbedFlags::ADULT;
+        }
+    }
+
+    let links = resp
+        .headers()
+        .get("link")
+        .and_then(|h| h.to_str().ok())
+        .map(crate::parser::oembed::parse_link_header);
+
+    embed.url = Some(url.as_str().into());
+
+    if let Some(link) = links.as_ref().and_then(|l| l.first()) {
+        if let Ok(o) = fetch_oembed(&state, link, url.domain()).await {
+            oembed = o;
+        }
+    }
+
+    drop(links);
+
+    if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
+        let Some(mime) = mime.split(';').next() else {
+            return Err(Error::InvalidMimeType);
+        };
+
+        if mime == "text/html" {
+            let max = state.config.parsed.limits.max_html_size;
+            let mut html = Vec::with_capacity(max.min(512));
+
+            if let Some(headers) = read_head(&mut resp, &mut html, max).await? {
+                let extra = crate::parser::embed::parse_meta_to_embed(&mut embed, &headers);
+
+                match extra.link {
+                    Some(link) if oembed.is_none() => {
+                        if let Ok(o) = fetch_oembed(&state, &link, url.domain()).await {
+                            oembed = o;
+                        }
+                    }
+                    _ => {}
+                }
+
+                max_age = extra.max_age;
+            }
+
+            drop(html); // ensure it lives long enough
+        } else if matches!(
+            mime,
+            "application/rss+xml" | "application/feed+json" | "application/atom+xml" | "application/xml"
+        ) {
+            let max = state.config.parsed.limits.max_xml_size;
+            let mut body = Vec::with_capacity(max.min(512));
+
+            if let Ok(_) = read_bytes(&mut resp, &mut body, max).await {
+                // TODO: Maybe set the timestamp parser to use iso8601_timestamp
+                let parser = feed_rs::parser::Builder::new().base_uri(Some(url.as_str())).build();
+
+                if let Ok(feed) = parser.parse(&*body) {
+                    max_age = Some(crate::parser::feed::feed_into_embed(&mut embed, feed));
+                }
+            }
+
+            drop(body);
+        } else {
+            let mut media = Box::<EmbedMedia>::default();
+            media.url = url.as_str().into();
+            media.mime = Some(mime.into());
+
+            match mime.get(0..5) {
+                Some("image") => {
+                    let max = state.config.parsed.limits.max_media_size;
+                    let mut bytes = Vec::with_capacity(max.min(512));
+
+                    if let Ok(_) = read_bytes(&mut resp, &mut bytes, max).await {
+                        if let Ok(image_size) = imagesize::blob_size(&bytes) {
+                            media.width = Some(image_size.width as _);
+                            media.height = Some(image_size.height as _);
+                        }
+                    }
+
+                    embed.ty = EmbedType::Img;
+                    embed.img = Some(media);
+                }
+                Some("video") => {
+                    embed.ty = EmbedType::Vid;
+                    embed.video = Some(media);
+                }
+                Some("audio") => {
+                    embed.ty = EmbedType::Audio;
+                    embed.audio = Some(media);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if let Some(oembed) = oembed {
+        let extra = crate::parser::embed::parse_oembed_to_embed(&mut embed, oembed);
+
+        max_age = extra.max_age;
+    }
+
+    crate::parser::quirks::resolve_relative(&url, &mut embed);
+
+    if state.config.parsed.resolve_media {
+        resolve_images(&state, &site, &mut embed).await?;
+    }
+
+    if let Some(domain) = url.domain() {
+        if !state.config.allow_html(domain).is_match() {
+            embed.obj = None;
+
+            if let Some(ref vid) = embed.video {
+                if let Some(ref mime) = vid.mime {
+                    if mime.starts_with("text/html") {
+                        embed.video = None;
+                    }
+                }
+            }
+        }
+
+        if let Some(site) = state.config.find_site(domain) {
+            embed.color = site.color.or(embed.color);
+        }
+    }
+
+    Ok(RawGenericExtraction {
+        state,
+        embed,
+        max_age,
+    })
+}
+
 #[async_trait::async_trait]
 impl Extractor for GenericExtractor {
     fn matches(&self, _: &url::Url) -> bool {
@@ -22,168 +218,7 @@ impl Extractor for GenericExtractor {
         url: url::Url,
         params: Params,
     ) -> Result<EmbedWithExpire, Error> {
-        if !url.scheme().starts_with("http") {
-            return Err(Error::InvalidUrl);
-        }
-
-        let site = url.domain().and_then(|domain| state.config.find_site(domain));
-
-        let mut resp = retry_request(2, || {
-            let mut req = state.client.get(url.as_str());
-
-            if let Some(ref site) = site {
-                req = site.add_headers(&state.config, req);
-            }
-
-            if let Some(ref lang) = params.lang {
-                req = req.header(
-                    HeaderName::from_static("accept-language"),
-                    format!("{lang};q=0.5"),
-                );
-            }
-
-            req
-        })
-        .await?;
-
-        if !resp.status().is_success() {
-            return Err(Error::Failure(resp.status()));
-        }
-
-        let mut embed = EmbedV1::default();
-        let mut oembed: Option<OEmbed> = None;
-
-        // seconds until embed expires
-        let mut max_age = None;
-
-        if let Some(rating) = resp.headers().get(HeaderName::from_static("rating")) {
-            if crate::parser::regexes::ADULT_RATING.is_match(rating.as_bytes()) {
-                embed.flags |= EmbedFlags::ADULT;
-            }
-        }
-
-        let links = resp
-            .headers()
-            .get("link")
-            .and_then(|h| h.to_str().ok())
-            .map(crate::parser::oembed::parse_link_header);
-
-        embed.url = Some(url.as_str().into());
-
-        if let Some(link) = links.as_ref().and_then(|l| l.first()) {
-            if let Ok(o) = fetch_oembed(&state, link, url.domain()).await {
-                oembed = o;
-            }
-        }
-
-        drop(links);
-
-        if let Some(mime) = resp.headers().get("content-type").and_then(|h| h.to_str().ok()) {
-            let Some(mime) = mime.split(';').next() else {
-                return Err(Error::InvalidMimeType);
-            };
-
-            if mime == "text/html" {
-                let max = state.config.parsed.limits.max_html_size;
-                let mut html = Vec::with_capacity(max.min(512));
-
-                if let Some(headers) = read_head(&mut resp, &mut html, max).await? {
-                    let extra = crate::parser::embed::parse_meta_to_embed(&mut embed, &headers);
-
-                    match extra.link {
-                        Some(link) if oembed.is_none() => {
-                            if let Ok(o) = fetch_oembed(&state, &link, url.domain()).await {
-                                oembed = o;
-                            }
-                        }
-                        _ => {}
-                    }
-
-                    max_age = extra.max_age;
-                }
-
-                drop(html); // ensure it lives long enough
-            } else if matches!(
-                mime,
-                "application/rss+xml" | "application/feed+json" | "application/atom+xml" | "application/xml"
-            ) {
-                let max = state.config.parsed.limits.max_xml_size;
-                let mut body = Vec::with_capacity(max.min(512));
-
-                if let Ok(_) = read_bytes(&mut resp, &mut body, max).await {
-                    // TODO: Maybe set the timestamp parser to use iso8601_timestamp
-                    let parser = feed_rs::parser::Builder::new().base_uri(Some(url.as_str())).build();
-
-                    if let Ok(feed) = parser.parse(&*body) {
-                        max_age = Some(crate::parser::feed::feed_into_embed(&mut embed, feed));
-                    }
-                }
-
-                drop(body);
-            } else {
-                let mut media = Box::<EmbedMedia>::default();
-                media.url = url.as_str().into();
-                media.mime = Some(mime.into());
-
-                match mime.get(0..5) {
-                    Some("image") => {
-                        let max = state.config.parsed.limits.max_media_size;
-                        let mut bytes = Vec::with_capacity(max.min(512));
-
-                        if let Ok(_) = read_bytes(&mut resp, &mut bytes, max).await {
-                            if let Ok(image_size) = imagesize::blob_size(&bytes) {
-                                media.width = Some(image_size.width as _);
-                                media.height = Some(image_size.height as _);
-                            }
-                        }
-
-                        embed.ty = EmbedType::Img;
-                        embed.img = Some(media);
-                    }
-                    Some("video") => {
-                        embed.ty = EmbedType::Vid;
-                        embed.video = Some(media);
-                    }
-                    Some("audio") => {
-                        embed.ty = EmbedType::Audio;
-                        embed.audio = Some(media);
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        if let Some(oembed) = oembed {
-            let extra = crate::parser::embed::parse_oembed_to_embed(&mut embed, oembed);
-
-            max_age = extra.max_age;
-        }
-
-        crate::parser::quirks::resolve_relative(&url, &mut embed);
-
-        if state.config.parsed.resolve_media {
-            resolve_images(&state, &site, &mut embed).await?;
-        }
-
-        if let Some(domain) = url.domain() {
-            if !state.config.allow_html(domain).is_match() {
-                embed.obj = None;
-
-                if let Some(ref vid) = embed.video {
-                    if let Some(ref mime) = vid.mime {
-                        if mime.starts_with("text/html") {
-                            embed.video = None;
-                        }
-                    }
-                }
-            }
-
-            if let Some(site) = state.config.find_site(domain) {
-                embed.color = site.color.or(embed.color);
-            }
-        }
-
-        Ok(finalize_embed(state, embed, max_age))
+        extract(state, url, params).await
     }
 }
 

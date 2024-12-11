@@ -122,8 +122,8 @@ async fn fetch_single_id(
     let mut file = &post.file;
 
     match post.sample {
-        // very large file, revert to sample
-        Some(ref sample) if file.height > 4096 || file.width > 4096 => {
+        // large file, revert to sample
+        Some(ref sample) if file.height > 2048 || file.width > 2048 => {
             file = &sample.file;
         }
         _ => {}
@@ -137,7 +137,8 @@ async fn fetch_single_id(
     // if dumb/simple things fail early.
     let mut embed = EmbedV1::default();
 
-    if post.rating == Rating::Explicit {
+    // questionable can still contain nudity, so safe is the only one that's truly safe
+    if post.rating != Rating::Safe {
         embed.flags |= EmbedFlags::ADULT;
     }
 

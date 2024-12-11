@@ -72,6 +72,7 @@ mod prelude {
 
 pub mod generic;
 
+pub mod bluesky;
 pub mod deviantart;
 pub mod e621;
 pub mod furaffinity;
@@ -88,6 +89,7 @@ pub fn extractor_factories() -> Vec<Box<dyn ExtractorFactory>> {
         Box::new(imgur::ImgurExtractorFactory),
         Box::new(inkbunny::InkbunnyExtractorFactory),
         Box::new(furaffinity::FurAffinityExtractorFactory),
+        Box::new(bluesky::BlueskyExtractorFactory),
         Box::new(generic::GenericExtractor),
     ]
 }
