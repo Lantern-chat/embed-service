@@ -159,8 +159,6 @@ impl Extractor for BlueskyExtractor {
                     footer
                 });
 
-                let mut append_metadata = false;
-
                 let bsky_embed = match post.embed {
                     BskyEmbed::RecordWithMedia { media, record } => {
                         if let BskyRecord::Record { value, author, .. } = record.record {
@@ -173,8 +171,6 @@ impl Extractor for BlueskyExtractor {
                                     &text,
                                 )
                                 .unwrap();
-
-                                append_metadata = true;
                             }
                         }
 
@@ -196,8 +192,6 @@ impl Extractor for BlueskyExtractor {
                                 )
                                 .unwrap();
 
-                                append_metadata = true;
-
                                 embeds.pop().map(|embed| embed.embed()).unwrap_or(BskyEmbed::Unknown)
                             } else {
                                 BskyEmbed::Unknown
@@ -214,27 +208,17 @@ impl Extractor for BlueskyExtractor {
                     BskyEmbed::External { external } => {
                         embed.url = Some(external.uri);
 
-                        if append_metadata {
-                            if !external.title.is_empty() {
-                                let title = embed.title.get_or_insert_default();
+                        if !external.title.is_empty() {
+                            let desc = embed.description.get_or_insert_default();
 
-                                write!(title, "\n\n> **{}**", external.title).unwrap();
-                            }
+                            write!(desc, "\n\n> **{}**", external.title).unwrap();
+                        }
 
-                            if !external.description.is_empty() {
-                                let desc = embed.description.get_or_insert_default();
+                        if !external.description.is_empty() {
+                            let desc = embed.description.get_or_insert_default();
 
-                                for line in external.description.lines() {
-                                    write!(desc, "\n\n> {}", line.trim()).unwrap();
-                                }
-                            }
-                        } else {
-                            if !external.title.is_empty() {
-                                embed.title = Some(external.title);
-                            }
-
-                            if !external.description.is_empty() {
-                                embed.description = Some(external.description);
+                            for line in external.description.lines() {
+                                write!(desc, "\n\n> {}", line.trim()).unwrap();
                             }
                         }
                     }
