@@ -224,6 +224,10 @@ domains = [
 color = 0x35465c
 pattern = '''tumblr\.com$'''
 
+[sites.imdb]
+color = 0xF5C518
+pattern = '''imdb\.com$'''
+
 # https://github.com/dylanpdx/BetterTwitFix/blob/7a1c00ebdb6479afbfcca6d84450039d29029a75/twitfix.py#L35
 [sites.vxtwitter]
 domains = ["vxtwitter.com", "d.vx"]
