@@ -70,6 +70,9 @@ pub struct ParsedConfig {
     #[serde(default = "defaults::default_signed")]
     pub signed: bool,
 
+    #[serde(default = "defaults::default_markdown")]
+    pub markdown: bool,
+
     #[serde(default = "defaults::default_resolve_media")]
     pub resolve_media: bool,
 
@@ -104,6 +107,7 @@ mod defaults {
     pub const fn default_timeout() -> u64 { 4000 }
     pub const fn default_resolve_media() -> bool { true }
     pub const fn default_signed() -> bool { true }
+    pub const fn default_markdown() -> bool { true }
     pub const fn default_cache_size() -> usize { 1024 }
 }
 

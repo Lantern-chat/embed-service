@@ -31,6 +31,9 @@ pub enum BskyRecord {
         created_at: Timestamp,
         text: ThinString,
 
+        #[serde(default)]
+        facets: Vec<BskyFacet>,
+
         /// Only present with nested embeds
         #[serde(default)]
         author: Option<BskyProfile>,
@@ -144,7 +147,8 @@ impl BskyEmbed {
 pub struct BskyPost {
     pub record: BskyRecord,
 
-    pub embed: BskyEmbed,
+    #[serde(default)]
+    pub embed: Option<BskyEmbed>,
 
     pub reply_count: u32,
     pub repost_count: u32,
@@ -211,6 +215,7 @@ impl BskyLabel {
 pub fn write_footer<W>(
     w: &mut W,
     ts: Option<Timestamp>,
+    md: bool,
     like_count: u32,
     reply_count: u32,
     repost_count: u32,
@@ -221,9 +226,14 @@ where
 {
     use core::fmt::Write;
 
-    // TODO: Friendly formatting
-    if let Some(ts) = ts {
-        write!(w, "{ts} - ")?;
+    match (ts, md) {
+        (Some(ts), false) => write!(w, "{ts} - ")?,
+        (Some(ts), true) => write!(
+            w,
+            "<t:{}> - ",
+            ts.duration_since(Timestamp::UNIX_EPOCH).whole_seconds()
+        )?,
+        _ => {}
     }
 
     let symbols = [
@@ -265,4 +275,78 @@ where
     }
 
     Ok(())
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(tag = "$type")]
+pub enum BskyFacetFeatures {
+    #[serde(rename = "app.bsky.richtext.facet#link", alias = "app.bsky.richtext.facet")]
+    RichTextLink { uri: ThinString },
+
+    #[serde(other)]
+    Unknown,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct BskyFacetIndex {
+    #[serde(rename = "byteStart")]
+    start: usize,
+
+    #[serde(rename = "byteEnd")]
+    end: usize,
+}
+
+impl BskyFacetIndex {
+    pub fn as_range(&self) -> core::ops::Range<usize> {
+        self.start..self.end
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct BskyFacet {
+    pub features: Vec<BskyFacetFeatures>,
+    pub index: BskyFacetIndex,
+}
+
+pub fn apply_facets(text: ThinString, mut facets: Vec<BskyFacet>) -> ThinString {
+    facets.retain(|facet| {
+        facet.features.iter().any(|feature| matches!(feature, BskyFacetFeatures::RichTextLink { .. }))
+    });
+
+    if facets.is_empty() {
+        return text;
+    }
+
+    // As per the docs: Facets cannot overlap.
+    // It's recommended that renderers sort them by byteStart
+    facets.sort_by_key(|facet| facet.index.start);
+
+    let mut out = ThinString::with_capacity(text.len());
+
+    let mut last = 0;
+
+    for facet in facets {
+        let range = facet.index.as_range();
+
+        out.push_str(&text[last..range.start]);
+
+        let text = &text[range.clone()];
+
+        // TODO: Fix this for multiple features in a facet?
+        for feature in &facet.features {
+            match feature {
+                BskyFacetFeatures::RichTextLink { uri } => {
+                    write!(out, "[{text}]({uri})").unwrap();
+                    break;
+                }
+                _ => out.push_str(text), // ignore unknown facets
+            }
+        }
+
+        last = range.end;
+    }
+
+    out.push_str(&text[last..]);
+
+    out
 }

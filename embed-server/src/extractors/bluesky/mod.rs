@@ -66,6 +66,9 @@ impl Extractor for BlueskyExtractor {
                     return Err(Error::Failure(resp.status()));
                 }
 
+                // TODO: Compute this based on response?
+                let max_age = Some(60 * 60 * 4); // 4-hour expire
+
                 let profile: BskyProfile = resp.json().await?;
 
                 let mut embed = EmbedV1::default();
@@ -100,8 +103,7 @@ impl Extractor for BlueskyExtractor {
                     break 'extract RawGenericExtraction {
                         state,
                         embed,
-                        // 4-hour expire
-                        max_age: Some(60 * 60 * 4),
+                        max_age,
                     };
                 };
 
@@ -123,21 +125,31 @@ impl Extractor for BlueskyExtractor {
 
                 // handle unknown record/embed types in one place
                 match (&post.record, &post.embed) {
-                    (BskyRecord::Unknown, _) | (_, BskyEmbed::Unknown) => {
+                    (BskyRecord::Unknown, _) | (_, Some(BskyEmbed::Unknown)) => {
                         break 'extract generic::extract_raw(state, url, params).boxed().await?;
                     }
                     _ => {}
                 }
 
                 let mut ts = None;
+                let markdown = state.config.parsed.markdown;
 
                 match post.record {
                     BskyRecord::Unknown => unreachable!(),
 
                     // nested embeds won't ever appear here
-                    BskyRecord::Post { created_at, text, .. } => {
+                    BskyRecord::Post {
+                        created_at,
+                        text,
+                        facets,
+                        ..
+                    } => {
                         ts = Some(created_at);
-                        embed.description = Some(text);
+
+                        embed.description = Some(match markdown {
+                            true => apply_facets(text, facets),
+                            false => text,
+                        });
                     }
 
                     BskyRecord::Record { .. } => {}
@@ -149,6 +161,7 @@ impl Extractor for BlueskyExtractor {
                     write_footer(
                         &mut footer.text,
                         ts,
+                        markdown,
                         post.like_count,
                         post.reply_count,
                         post.repost_count,
@@ -159,7 +172,16 @@ impl Extractor for BlueskyExtractor {
                     footer
                 });
 
-                let bsky_embed = match post.embed {
+                // Not all posts contain embeds
+                let Some(bsky_embed) = post.embed else {
+                    break 'extract RawGenericExtraction {
+                        state,
+                        embed,
+                        max_age,
+                    };
+                };
+
+                let bsky_embed = match bsky_embed {
                     BskyEmbed::RecordWithMedia { media, record } => {
                         if let BskyRecord::Record { value, author, .. } = record.record {
                             // can't nest this in the pattern match due to boxing
@@ -265,8 +287,7 @@ impl Extractor for BlueskyExtractor {
                 RawGenericExtraction {
                     state,
                     embed,
-                    // 4-hour expire
-                    max_age: Some(60 * 60 * 4),
+                    max_age,
                 }
             }
             _ => generic::extract_raw(state, url, params).boxed().await?,
