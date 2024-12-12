@@ -49,13 +49,10 @@ pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
 pub fn fix_embed(embed: &mut EmbedV1) {
     // get rid of invalid images introduced through bad embeds
     {
-        if let Some(ref img) = embed.img {
-            if let Some(ref mime) = img.mime {
-                if !mime.starts_with("image") {
-                    embed.img = None;
-                }
-            }
-        }
+        embed.imgs.retain(|img| match img.mime {
+            Some(ref mime) => mime.starts_with("image"),
+            None => false,
+        });
 
         if let Some(ref obj) = embed.obj {
             if let Some(ref mime) = obj.mime {
@@ -92,29 +89,31 @@ pub fn fix_embed(embed: &mut EmbedV1) {
         _ => {}
     }
 
-    // redundant thumbnail
-    match (&embed.img, &embed.thumb) {
-        (Some(img), Some(thumb)) if thumb.url == img.url => {
+    if let Some(ref thumb) = embed.thumb {
+        // redundant thumbnail
+        if embed.imgs.iter().any(|img| img.url == thumb.url) {
             embed.thumb = None;
         }
-        _ => {}
     }
 
     // remove empty fields
     embed.fields.retain(|f| !EmbedField::is_empty(f));
 
-    if let Some(ref img) = embed.img {
-        match (img.width, img.height) {
-            // if there is a tiny main image, relegate it down to a thumbnail
-            (Some(w), Some(h)) if w <= 320 && h <= 320 => {
-                embed.thumb = std::mem::take(&mut embed.img);
+    match embed.imgs.first() {
+        Some(img) if embed.imgs.len() == 1 => {
+            match (img.width, img.height) {
+                // if there is a tiny main image, relegate it down to a thumbnail
+                (Some(w), Some(h)) if w <= 320 && h <= 320 => {
+                    embed.thumb = embed.imgs.pop().map(Box::new);
 
-                if embed.ty == EmbedType::Img {
-                    embed.ty = EmbedType::Link;
+                    if embed.ty == EmbedType::Img {
+                        embed.ty = EmbedType::Link;
+                    }
                 }
+                _ => {}
             }
-            _ => {}
         }
+        _ => {}
     }
 
     // Avoid alt-text that's the same as the description

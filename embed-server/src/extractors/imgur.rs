@@ -112,50 +112,64 @@ impl Extractor for ImgurExtractor {
         let mut embed = EmbedV1::default();
 
         #[rustfmt::skip]
-        let image = match &mut data.kind {
-            | ImgurDataKind::Gallery { images, .. }
-            | ImgurDataKind::Album { images, .. } => match data.cover {
+        let images: &mut [ImgurImageData] = match data.kind {
+            | ImgurDataKind::Gallery { ref mut images, .. }
+            | ImgurDataKind::Album { ref mut images, .. } => match data.cover {
                 Some(ref cover) => match images.iter_mut().find(|img| img.id == *cover) {
-                    Some(image) => Some(image),
-                    None => images.get_mut(0),
+                    Some(image) => core::slice::from_mut(image),
+                    None => images.as_mut_slice(),
                 },
-                None => images.get_mut(0)
+                None => images.as_mut_slice(),
             },
-            ImgurDataKind::Image { image } => Some(image),
+            ImgurDataKind::Image { ref mut image } => {
+                core::slice::from_mut(image)
+            }
         };
 
-        let Some(image) = image else {
+        if images.is_empty() {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
-        };
-
-        let mut media = Box::<EmbedMedia>::default();
-
-        // add ?noredirect to imgur links because they're annoying
-        media.url = add_noredirect(std::mem::take(&mut image.link)).into();
-
-        media.width = image.width;
-        media.height = image.height;
-
-        match image.mime.take() {
-            Some(mime) if mime.contains('/') => media.mime = Some(mime),
-            _ => {}
         }
 
-        match media.mime {
-            Some(ref mime) if mime.starts_with("video") => {
-                match image.mp4.take() {
-                    Some(mp4) if mime.ends_with("webm") => {
-                        let mut alt = media.media.clone();
-                        alt.mime = Some(SmolStr::new_inline("video/mp4"));
-                        alt.url = add_noredirect(mp4).into();
-                        media.alts.push(alt);
-                    }
-                    _ => {}
-                }
+        let mut num_media = 0;
 
-                embed.video = Some(media);
+        for image in images.iter_mut().take(state.config.parsed.limits.max_images) {
+            let mut media = EmbedMedia::default();
+
+            // add ?noredirect to imgur links because they're annoying
+            media.url = add_noredirect(std::mem::take(&mut image.link)).into();
+
+            media.width = image.width;
+            media.height = image.height;
+
+            match image.mime.take() {
+                Some(mime) if mime.contains('/') => media.mime = Some(mime),
+                _ => {}
             }
-            _ => embed.img = Some(media),
+
+            match media.mime {
+                Some(ref mime) if mime.starts_with("video") => {
+                    embed.imgs.clear();
+
+                    match image.mp4.take() {
+                        Some(mp4) if mime.ends_with("webm") => {
+                            let mut alt = media.media.clone();
+                            alt.mime = Some(SmolStr::new_inline("video/mp4"));
+                            alt.url = add_noredirect(mp4).into();
+                            media.alts.push(alt);
+                        }
+                        _ => {}
+                    }
+
+                    embed.video = Some(Box::new(media));
+
+                    num_media = 1;
+
+                    break;
+                }
+                _ => embed.imgs.push(media),
+            }
+
+            num_media += 1;
         }
 
         static IMGUR_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
@@ -190,12 +204,13 @@ impl Extractor for ImgurExtractor {
 
         embed.color = Some(0x85bf25);
 
-        if data.images_count > 1 {
-            let rem = data.images_count - 1;
+        let remaining_images = data.images_count - num_media;
+
+        if remaining_images > 0 {
             embed.footer = Some(EmbedFooter {
                 text: format_thin_string!(
-                    "and {rem} more {}",
-                    match rem {
+                    "and {remaining_images} more {}",
+                    match remaining_images {
                         1 => "file",
                         _ => "files",
                     }

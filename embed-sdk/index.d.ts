@@ -19,8 +19,14 @@ export const enum EmbedFlags {
      * NOTE: This is not always accurate, and is provided on a best-effort basis
      */
     ADULT = 0x2,
+    /**
+     * This embed contains graphics content such as violence or gore
+     *
+     * NOTE: This is not always accurate, and is provided on a best-effort basis
+     */
+    GRAPHIC = 0x4,
     /** All bitflags of EmbedFlags */
-    ALL = 0x3,
+    ALL = 0x7,
 }
 
 export interface BasicEmbedMedia {
@@ -93,7 +99,8 @@ export interface EmbedV1 {
      * See: <https://www.html5rocks.com/en/tutorials/security/sandboxed-iframes/>
      */
     obj?: EmbedMedia,
-    img?: EmbedMedia,
+    /** Contains images for the embed */
+    imgs?: Array<EmbedMedia>,
     audio?: EmbedMedia,
     vid?: EmbedMedia,
     thumb?: EmbedMedia,

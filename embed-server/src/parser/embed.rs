@@ -98,6 +98,15 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
         };
     }
 
+    macro_rules! get_img {
+        () => {{
+            if embed.imgs.is_empty() {
+                embed.imgs.push(EmbedMedia::default());
+            }
+            embed.imgs.first_mut().unwrap()
+        }};
+    }
+
     for header in headers {
         match header {
             Header::Meta(meta) => {
@@ -141,28 +150,28 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
                     "dc:creator" | "article:author" | "book:author" => get!(author).name = raw_content!(),
 
                     // don't let the twitter image overwrite og images
-                    "twitter:image" => match embed.img {
-                        Some(ref mut image) if image.url.is_empty() => image.url = raw_content!(),
-                        None => get!(img).url = raw_content!(),
+                    "twitter:image" => match embed.imgs.first_mut() {
+                        Some(image) if image.url.is_empty() => image.url = raw_content!(),
+                        None => get_img!().url = raw_content!(),
                         _ => {}
                     },
 
-                    "og:image" | "og:image:url" | "og:image:secure_url" => get!(img).url = raw_content!(),
+                    "og:image" | "og:image:url" | "og:image:secure_url" => get_img!().url = raw_content!(),
                     "og:video" | "og:video:url" | "og:video:secure_url" => get!(video).url = raw_content!(),
                     "og:audio" | "og:audio:url" | "og:audio:secure_url" => get!(audio).url = raw_content!(),
 
-                    "og:image:width" => get!(img).width = content_int(),
+                    "og:image:width" => get_img!().width = content_int(),
                     "og:video:width" => get!(video).width = content_int(),
                     "music:duration" => get!(audio).width = content_int(),
 
-                    "og:image:height" => get!(img).height = content_int(),
+                    "og:image:height" => get_img!().height = content_int(),
                     "og:video:height" => get!(video).height = content_int(),
 
-                    "og:image:type" => get!(img).mime = content!(),
+                    "og:image:type" => get_img!().mime = content!(),
                     "og:video:type" => get!(video).mime = content!(),
                     "og:audio:type" => get!(audio).mime = content!(),
 
-                    "og:image:alt" => get!(img).description = content!(),
+                    "og:image:alt" => get_img!().description = content!(),
                     "og:video:alt" => get!(video).description = content!(),
                     "og:audio:alt" => get!(audio).description = content!(),
 
@@ -288,6 +297,12 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 }
 
 pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
+    if !embed.imgs.iter().any(|img| img.url.is_empty()) {
+        embed.ty = EmbedType::Img;
+    } else if embed.ty == EmbedType::Img {
+        embed.ty = EmbedType::Link;
+    }
+
     let mut check_type = |media: &Option<Box<EmbedMedia>>, ty: EmbedType| {
         if !EmbedMedia::is_empty(media) {
             embed.ty = ty;
@@ -297,7 +312,6 @@ pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
         }
     };
 
-    check_type(&embed.img, EmbedType::Img);
     check_type(&embed.audio, EmbedType::Audio);
     check_type(&embed.video, EmbedType::Vid);
     check_type(&embed.obj, EmbedType::Html);
@@ -357,9 +371,12 @@ pub fn parse_oembed_to_embed(embed: &mut EmbedV1, mut o: OEmbed) -> ExtraFields 
     }
 
     let media = match o.kind {
-        OEmbedType::Photo => get!(img),
-        OEmbedType::Video => get!(video),
-        _ => get!(obj),
+        OEmbedType::Photo => {
+            embed.imgs.push(EmbedMedia::default());
+            embed.imgs.first_mut().unwrap()
+        }
+        OEmbedType::Video => &mut **get!(video),
+        _ => &mut **get!(obj),
     };
 
     let mut mime = media.mime.take();

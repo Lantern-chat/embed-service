@@ -148,7 +148,7 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
                 match kind {
                     Kind::Image if use_thumbnail => embed.thumb = Some(media),
-                    Kind::Image => embed.img = Some(media),
+                    Kind::Image => embed.imgs.push(*media),
                     Kind::Video => embed.video = Some(media),
                     Kind::Audio => embed.audio = Some(media),
                     _ => {}

@@ -151,7 +151,7 @@ async fn fetch_single_id(
         main_embed.mime = mime.as_ref().map(|m| m.to_smolstr());
 
         match mime.as_ref().map(|m| m.type_().as_str()) {
-            Some("image") => embed.img = Some(main_embed),
+            Some("image") => embed.imgs.push(*main_embed),
             Some("video") => embed.video = Some(main_embed),
             Some("audio") => embed.audio = Some(main_embed),
             _ if post.preview.is_some() => {
@@ -167,7 +167,7 @@ async fn fetch_single_id(
         }
     }
 
-    if embed.img.is_none() && embed.video.is_none() && embed.audio.is_none() {
+    if embed.imgs.is_empty() && embed.video.is_none() && embed.audio.is_none() {
         return Err(Error::Failure(StatusCode::UNSUPPORTED_MEDIA_TYPE));
     }
 

@@ -186,7 +186,7 @@ impl BskyLabel {
         }
 
         if self.val.contains("graphic-media") {
-            return EmbedFlags::ADULT | EmbedFlags::SPOILER;
+            return EmbedFlags::GRAPHIC | EmbedFlags::SPOILER;
         }
 
         EmbedFlags::empty()

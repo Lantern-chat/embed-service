@@ -223,10 +223,8 @@ impl Extractor for BlueskyExtractor {
                         }
                     }
                     BskyEmbed::Images { images } => {
-                        let mut media = Box::<EmbedMedia>::default();
-
-                        for image in images {
-                            let mut img = BasicEmbedMedia::default();
+                        for image in images.into_iter().take(state.config.parsed.limits.max_images) {
+                            let mut img = EmbedMedia::default();
 
                             img.url = match image.thumb.is_empty() {
                                 true => image.fullsize,
@@ -237,10 +235,8 @@ impl Extractor for BlueskyExtractor {
                             img.height = Some(image.aspect_ratio.height as i32);
                             img.mime = Some("image/jpeg".into());
 
-                            media.alts.push(img);
+                            embed.imgs.push(img);
                         }
-
-                        embed.img = Some(media);
                     }
                     BskyEmbed::Video { video, .. } => {
                         if !video.thumbnail.is_empty() {

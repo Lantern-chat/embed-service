@@ -153,7 +153,7 @@ pub async fn extract_raw(
                     }
 
                     embed.ty = EmbedType::Img;
-                    embed.img = Some(media);
+                    embed.imgs.push(*media);
                 }
                 Some("video") => {
                     embed.ty = EmbedType::Vid;
@@ -320,8 +320,8 @@ pub async fn resolve_images(
 
     let f = FuturesUnordered::new();
 
-    if let Some(ref mut media) = embed.img {
-        f.push(resolve_media(state, site, &mut *media, false));
+    for media in &mut embed.imgs {
+        f.push(resolve_media(state, site, media, false));
     }
 
     if let Some(ref mut media) = embed.thumb {

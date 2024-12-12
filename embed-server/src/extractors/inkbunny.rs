@@ -175,7 +175,7 @@ impl Extractor for InkbunnyExtractor {
             }
 
             match kind {
-                Kind::Image => embed.img = Some(media),
+                Kind::Image => embed.imgs.push(*media),
                 Kind::Video => embed.video = Some(media),
                 Kind::Audio => embed.audio = Some(media),
                 _ => {}
@@ -223,7 +223,7 @@ impl Extractor for InkbunnyExtractor {
             embed.flags |= EmbedFlags::ADULT;
         }
 
-        if embed.img.is_some() || embed.video.is_some() {
+        if !embed.imgs.is_empty() || embed.video.is_some() {
             embed.thumb = None;
         }
 

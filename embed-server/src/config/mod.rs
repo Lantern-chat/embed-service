@@ -39,6 +39,9 @@ pub struct Limits {
     pub max_html_size: usize,
     pub max_xml_size: usize,
     pub max_media_size: usize,
+
+    /// Maximum number of images to include in an embed
+    pub max_images: usize,
 }
 
 impl Default for Limits {
@@ -47,6 +50,7 @@ impl Default for Limits {
             max_html_size: 1024 * 1024,
             max_xml_size: 1024 * 1024,
             max_media_size: 1024 * 1024,
+            max_images: 4,
         }
     }
 }
