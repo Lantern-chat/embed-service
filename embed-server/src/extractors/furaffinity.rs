@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::LazyLock};
 
 use super::prelude::*;
 
@@ -120,9 +120,8 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
         let mut kind = Kind::Unsupported;
 
         for e in node.traverse() {
-            let Edge::Open(node) = e else {
-                continue;
-            };
+            let Edge::Open(node) = e else { continue };
+
             if let Node::Element(el) = node.value() {
                 kind = match el.name() {
                     "img" => Kind::Image,
@@ -224,6 +223,43 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
     if let Some(node) = doc.select(selector!("span.rating-box")).next() {
         if !node.value().has_class("general", AsciiCaseInsensitive) {
             embed.flags |= EmbedFlags::ADULT;
+        }
+    }
+
+    // attempt to find additional content tags, since FA isn't great at enforcing
+    // the rating system.
+    for tag in doc.select(selector!("span.tags > a")) {
+        // tag elements only contain one text node
+        if let Some(tag) = tag.text().next() {
+            // FA has a very lax rating system, so we have to be very specific, unfortunately.
+            // These are on a best-effort basis, as I don't have the ability or desire to
+            // manually look through every tag. Honestly annoying this stuff slips through.
+            #[rustfmt::skip]
+            static ADULT_TAGS: LazyLock<TagChecker> = LazyLock::new(|| {
+                TagChecker::new([
+                    "nsfw", "sex", "horny", "r18", "fetish", "hentai", "yiff",
+                    "rape", "necrophilia", "vore", "hyper", "clit",
+                    "erection", "penis", "cum", "pussy", "dick",
+                    "porn", "ssbbw", "immobility", "ussbbw",
+                ])
+            });
+
+            // don't check for adult tags if the embed is already marked as adult
+            if !embed.flags.contains(EmbedFlags::ADULT) && ADULT_TAGS.contains(tag) {
+                embed.flags |= EmbedFlags::ADULT;
+            }
+
+            // Again, not happy I have to list these.
+            static GRAPHIC_TAGS: LazyLock<TagChecker> =
+                LazyLock::new(|| TagChecker::new(["gore", "snuff", "necrophilia"]));
+
+            if !embed.flags.contains(EmbedFlags::GRAPHIC) && GRAPHIC_TAGS.contains(tag) {
+                embed.flags |= EmbedFlags::GRAPHIC;
+            }
+
+            if embed.flags.contains(EmbedFlags::ADULT | EmbedFlags::GRAPHIC) {
+                break;
+            }
         }
     }
 

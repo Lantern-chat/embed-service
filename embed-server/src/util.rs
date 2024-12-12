@@ -86,3 +86,34 @@ pub fn trim_text(text: &str) -> Cow<str> {
 
     trimmed
 }
+
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder, Anchored, Input, StartKind};
+
+pub struct TagChecker {
+    pub tags: AhoCorasick,
+}
+
+impl TagChecker {
+    pub fn new<P>(tags: impl IntoIterator<Item = P>) -> Self
+    where
+        P: AsRef<[u8]>,
+    {
+        Self {
+            tags: AhoCorasickBuilder::new()
+                .ascii_case_insensitive(true)
+                .start_kind(StartKind::Anchored)
+                .build(tags)
+                .unwrap(),
+        }
+    }
+
+    pub fn contains<H>(&self, tag: &H) -> bool
+    where
+        H: ?Sized + AsRef<[u8]>,
+    {
+        self.tags
+            .try_find(Input::new(tag).anchored(Anchored::Yes).earliest(true))
+            .expect("AhoCorasick::try_find is not expected to fail")
+            .is_some()
+    }
+}

@@ -64,6 +64,7 @@ mod prelude {
 
     pub(crate) use crate::{
         config::{Config, ConfigError},
+        util::TagChecker,
         Error, Params, ServiceState, Site,
     };
 

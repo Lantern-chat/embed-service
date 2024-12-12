@@ -1,4 +1,5 @@
 use hashbrown::HashMap;
+use std::sync::LazyLock;
 
 use super::prelude::*;
 
@@ -140,6 +141,15 @@ async fn fetch_single_id(
     // questionable can still contain nudity, so safe is the only one that's truly safe
     if post.rating != Rating::Safe {
         embed.flags |= EmbedFlags::ADULT;
+    }
+
+    // NOTE: I don't enjoy that I have to list these, but they
+    // need to be marked as graphic.
+    static GRAPHIC_TAGS: LazyLock<TagChecker> =
+        LazyLock::new(|| TagChecker::new(["gore", "snuff", "necrophilia"]));
+
+    if post.tags.general.iter().any(|tag| GRAPHIC_TAGS.contains(tag)) {
+        embed.flags |= EmbedFlags::GRAPHIC;
     }
 
     let mut main_embed =
