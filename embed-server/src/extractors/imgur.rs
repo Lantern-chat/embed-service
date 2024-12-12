@@ -55,7 +55,8 @@ impl Extractor for ImgurExtractor {
             return false;
         };
 
-        potential_image_id.chars().all(|c| c.is_ascii_alphanumeric())
+        // urls contain post titles now, so we have to support that
+        potential_image_id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
     }
 
     #[instrument(skip_all)]
@@ -83,14 +84,23 @@ impl Extractor for ImgurExtractor {
             return Err(Error::Failure(StatusCode::NOT_FOUND));
         };
 
+        // trim any post titles from the URL
+        let Some(id) = id.split('-').last() else {
+            return Err(Error::Failure(StatusCode::NOT_FOUND));
+        };
+
         let resp = state
             .client
             .get(format!("https://api.imgur.com/3/{api}/{id}"))
             .header(HeaderName::from_static("authorization"), &self.client_id)
             .send()
-            .await?
-            .json()
             .await?;
+
+        if !resp.status().is_success() {
+            return Err(Error::Failure(resp.status()));
+        }
+
+        let resp = resp.json().await?;
 
         let ImgurResult::Success {
             data: Some(mut data), ..
