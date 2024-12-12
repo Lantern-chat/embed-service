@@ -43,13 +43,14 @@ macro_rules! format_thin_string {
 }
 
 mod prelude {
+    pub use std::borrow::Cow;
     pub use std::fmt::Write;
-    pub use std::sync::Arc;
+    pub use std::sync::{Arc, LazyLock};
 
     pub use crate::parser::oembed::{OEmbed, OEmbedFormat, OEmbedLink};
 
     pub use futures_util::future::FutureExt;
-    pub use once_cell::sync::Lazy;
+
     pub use reqwest::{
         header::{HeaderName, HeaderValue},
         Method, StatusCode,

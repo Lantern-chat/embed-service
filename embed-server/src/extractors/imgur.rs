@@ -172,7 +172,7 @@ impl Extractor for ImgurExtractor {
             num_media += 1;
         }
 
-        static IMGUR_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+        static IMGUR_PROVIDER: LazyLock<EmbedProvider> = LazyLock::new(|| {
             let mut provider = EmbedProvider::default();
 
             provider.name = Some(SmolStr::new_inline("imgur"));

@@ -1,5 +1,3 @@
-use std::{borrow::Cow, sync::LazyLock};
-
 use super::prelude::*;
 
 use ego_tree::iter::Edge;
@@ -7,7 +5,7 @@ use scraper::{CaseSensitivity::AsciiCaseInsensitive, ElementRef, Node, Selector}
 
 macro_rules! selector {
     ($e: expr) => {{
-        static SELECTOR: Lazy<Selector> = Lazy::new(|| Selector::parse($e).unwrap());
+        static SELECTOR: LazyLock<Selector> = LazyLock::new(|| Selector::parse($e).unwrap());
         &*SELECTOR
     }};
 }
@@ -271,7 +269,7 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
     embed.color = Some(0xadd8f5);
 
-    static FA_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+    static FA_PROVIDER: LazyLock<EmbedProvider> = LazyLock::new(|| {
         let mut provider = EmbedProvider::default();
 
         provider.name = Some(SmolStr::new_inline("FurAffinity"));

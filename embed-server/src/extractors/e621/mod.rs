@@ -1,5 +1,4 @@
 use hashbrown::HashMap;
-use std::sync::LazyLock;
 
 use super::prelude::*;
 
@@ -250,8 +249,8 @@ async fn fetch_single_id(
     });
 
     embed.description = match crate::util::trim_text(&post.description) {
-        std::borrow::Cow::Borrowed(_) => Some(post.description),
-        std::borrow::Cow::Owned(desc) => Some(desc.into()),
+        Cow::Borrowed(_) => Some(post.description),
+        Cow::Owned(desc) => Some(desc.into()),
     };
 
     embed.color = Some(0x00549e);
@@ -265,7 +264,7 @@ async fn fetch_single_id(
     Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
 }
 
-static E621_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+static E621_PROVIDER: LazyLock<EmbedProvider> = LazyLock::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e621"));
     provider.url = Some(ThinString::from("https://e621.net"));
@@ -273,7 +272,7 @@ static E621_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
     provider
 });
 
-static E926_PROVIDER: Lazy<EmbedProvider> = Lazy::new(|| {
+static E926_PROVIDER: LazyLock<EmbedProvider> = LazyLock::new(|| {
     let mut provider = EmbedProvider::default();
     provider.name = Some(SmolStr::new_inline("e926"));
     provider.url = Some(ThinString::from("https://e926.net"));

@@ -285,7 +285,7 @@ pub async fn read_head<'a>(
         }
     }
 
-    if let std::borrow::Cow::Owned(new_html) = String::from_utf8_lossy(html) {
+    if let Cow::Owned(new_html) = String::from_utf8_lossy(html) {
         *html = new_html.into();
     }
 

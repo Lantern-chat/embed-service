@@ -51,9 +51,8 @@ smol_str = "0.3"
 heck = "0.5"
 mime_guess = "2.0.4"
 arc-swap = "1.7.0"
-scraper = { version = "0.21", default-features = false }
-once_cell = "1.17.1"
-ego-tree = "0.9"
+scraper = { version = "0.22", default-features = false }
+ego-tree = "0.10"
 serde_repr = "0.1.7"
 regex-automata = { version = "0.1.10", default-features = false }
 smallvec = "1.7.0"
