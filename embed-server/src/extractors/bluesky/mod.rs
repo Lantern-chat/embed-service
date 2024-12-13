@@ -147,7 +147,7 @@ impl Extractor for BlueskyExtractor {
                         ts = Some(created_at);
 
                         embed.description = Some(match markdown {
-                            true => apply_facets(text, facets),
+                            true => apply_facets(text, facets, &mut embed.flags),
                             false => text,
                         });
                     }

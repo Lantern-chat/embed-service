@@ -280,8 +280,11 @@ where
 #[derive(Debug, serde::Deserialize)]
 #[serde(tag = "$type")]
 pub enum BskyFacetFeatures {
-    #[serde(rename = "app.bsky.richtext.facet#link", alias = "app.bsky.richtext.facet")]
+    #[serde(rename = "app.bsky.richtext.facet#link")]
     RichTextLink { uri: ThinString },
+
+    #[serde(rename = "app.bsky.richtext.facet#tag")]
+    Tag { tag: SmolStr },
 
     #[serde(other)]
     Unknown,
@@ -308,7 +311,7 @@ pub struct BskyFacet {
     pub index: BskyFacetIndex,
 }
 
-pub fn apply_facets(text: ThinString, mut facets: Vec<BskyFacet>) -> ThinString {
+pub fn apply_facets(text: ThinString, mut facets: Vec<BskyFacet>, flags: &mut EmbedFlags) -> ThinString {
     facets.retain(|facet| {
         facet.features.iter().any(|feature| matches!(feature, BskyFacetFeatures::RichTextLink { .. }))
     });
@@ -332,15 +335,26 @@ pub fn apply_facets(text: ThinString, mut facets: Vec<BskyFacet>) -> ThinString 
 
         let text = &text[range.clone()];
 
-        // TODO: Fix this for multiple features in a facet?
         for feature in &facet.features {
             match feature {
                 BskyFacetFeatures::RichTextLink { uri } => {
                     write!(out, "[{text}]({uri})").unwrap();
-                    break;
+
+                    continue;
                 }
-                _ => out.push_str(text), // ignore unknown facets
+                BskyFacetFeatures::Tag { tag } => {
+                    if !flags.contains(EmbedFlags::ADULT) && ADULT_TAGS.is_match(tag) {
+                        flags.insert(EmbedFlags::ADULT);
+                    }
+
+                    if !flags.contains(EmbedFlags::GRAPHIC) && is_graphic(tag) {
+                        flags.insert(EmbedFlags::GRAPHIC);
+                    }
+                }
+                _ => {}
             }
+
+            out.push_str(text); // ignore other facets
         }
 
         last = range.end;
@@ -350,3 +364,34 @@ pub fn apply_facets(text: ThinString, mut facets: Vec<BskyFacet>) -> ThinString 
 
     out
 }
+
+use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
+
+// NOTE: These do not use the TagChecker type since users sometimes put random things in front of the tags,
+// and the TagChecker is anchored. This is a bit more lenient.
+
+// NOTE: These tag lists are on a best-effort basis and may not be exhaustive. Hopefully
+// bluesky's normal moderation ratings will catch most things to begin with.
+
+static ADULT_TAGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+    AhoCorasickBuilder::new()
+        .ascii_case_insensitive(true)
+        .build([
+            "nsfw", "murr", "r34", "egirl", "eboy", "goon", "nudes", "hentai", "yiff", "porn", "abdl",
+            "bdsm", "vore", "fetish",
+        ])
+        .unwrap()
+});
+
+fn is_graphic(tag: &str) -> bool {
+    // Gore/Guro may trigger the Scunthorpe problem when contained
+    // in other tags, so we check for them separately in entirety.
+    GRAPHIC_TAGS.is_match(tag) || ["gore", "guro"].iter().any(|t| t.eq_ignore_ascii_case(tag))
+}
+
+static GRAPHIC_TAGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+    AhoCorasickBuilder::new()
+        .ascii_case_insensitive(true)
+        .build(["shsky", "shtwt", "shbunny", "bodyhorror"])
+        .unwrap()
+});
