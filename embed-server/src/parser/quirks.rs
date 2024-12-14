@@ -113,6 +113,9 @@ pub fn fix_embed(embed: &mut EmbedV1) {
                 _ => {}
             }
         }
+        None if embed.ty == EmbedType::Img => {
+            embed.ty = EmbedType::Link;
+        }
         _ => {}
     }
 

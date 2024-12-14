@@ -297,7 +297,7 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
 }
 
 pub(crate) fn determine_embed_type(embed: &mut EmbedV1) {
-    if !embed.imgs.iter().any(|img| img.url.is_empty()) {
+    if embed.imgs.iter().any(|img| !img.url.is_empty()) {
         embed.ty = EmbedType::Img;
     } else if embed.ty == EmbedType::Img {
         embed.ty = EmbedType::Link;
