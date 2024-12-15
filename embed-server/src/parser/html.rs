@@ -23,6 +23,7 @@ pub enum LinkType {
     License,
     Shortlink,
     //Stylesheet,
+    Manifest,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,6 +42,7 @@ pub struct Link<'a> {
     pub title: Option<Cow<'a, str>>,
     pub mime: Option<Cow<'a, str>>,
     pub sizes: Option<[u32; 2]>,
+    pub crossorigin: Option<Cow<'a, str>>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -121,6 +123,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                 title: None,
                 mime: None,
                 sizes: None,
+                crossorigin: None,
             }),
             Some(etc) => {
                 if etc.starts_with("<div ") {
@@ -182,6 +185,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                         "href" => link.href = value,
                         "type" => link.ty = Some(value),
                         "title" => link.title = Some(value),
+                        "crossorigin" => link.crossorigin = Some(value),
                         "rel" => {
                             link.rel = match &*value {
                                 "alternate" => LinkType::Alternate,
@@ -189,6 +193,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
                                 "external" => LinkType::External,
                                 "license" => LinkType::License,
                                 "shortlink" => LinkType::Shortlink,
+                                "manifest" => LinkType::Manifest,
                                 "icon" | "shortcut icon" | "apple-touch-icon" => LinkType::Icon,
                                 _ => continue,
                             };

@@ -1,3 +1,5 @@
+use hashbrown::HashMap;
+
 use super::prelude::*;
 
 #[derive(Debug)]
@@ -427,6 +429,44 @@ pub async fn resolve_media(
     }
 
     Ok(())
+}
+
+#[derive(Default, Debug, serde::Deserialize)]
+#[serde(default)]
+pub struct WebAppManifest {
+    pub name: Option<SmolStr>,
+    pub name_localized: HashMap<SmolStr, LocalizedName>,
+
+    pub short_name: Option<SmolStr>,
+    pub short_name_localized: HashMap<SmolStr, LocalizedName>,
+
+    pub description: Option<SmolStr>,
+    pub description_localized: HashMap<SmolStr, LocalizedName>,
+
+    pub icons: Vec<ImageResource>,
+
+    pub theme_color: Option<SmolStr>,
+    pub background_color: Option<SmolStr>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct LocalizedName {
+    pub name: SmolStr,
+    pub lang: SmolStr,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct ImageResource {
+    pub src: String,
+
+    #[serde(default)]
+    pub sizes: Option<SmolStr>,
+
+    #[serde(default, rename = "type")]
+    pub mime: Option<SmolStr>,
+
+    #[serde(default)]
+    pub purpose: Option<String>,
 }
 
 fn scrape_fields(html: &str, embed: &mut EmbedV1, fields: &SiteFieldSelectors) {

@@ -10,6 +10,7 @@ use super::oembed::{OEmbed, OEmbedFormat, OEmbedLink, OEmbedType};
 pub struct ExtraFields<'a> {
     pub max_age: Option<u64>,
     pub link: Option<OEmbedLink<'a>>,
+    pub manifest: Option<String>,
 }
 
 fn parse_color(color: &str) -> Option<u32> {
@@ -252,6 +253,13 @@ pub fn parse_meta_to_embed<'a>(embed: &mut EmbedV1, headers: &[Header<'a>]) -> E
             }
             Header::Link(link) if link.rel == LinkType::Canonical => {
                 embed.canonical = Some(link.href.as_ref().into());
+            }
+            Header::Link(link)
+                if link.rel == LinkType::Manifest
+                    // we don't have credentials, so we can't use the manifest
+                    && link.crossorigin.as_deref() != Some("use-credentials") =>
+            {
+                extra.manifest = Some(link.href.as_ref().into());
             }
             Header::Link(link) if link.rel == LinkType::Alternate => {
                 let ty = match link.ty {
