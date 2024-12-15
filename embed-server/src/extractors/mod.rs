@@ -64,7 +64,7 @@ mod prelude {
     pub use embed::v1::*;
 
     pub(crate) use crate::{
-        config::{Config, ConfigError},
+        config::{selectors::SiteFieldSelectors, Config, ConfigError},
         util::TagChecker,
         Error, Params, ServiceState, Site,
     };

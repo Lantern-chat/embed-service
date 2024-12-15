@@ -36,8 +36,13 @@ pub enum ConfigError {
 #[derive(Debug, Clone, Copy, serde::Deserialize)]
 #[serde(default)]
 pub struct Limits {
+    #[serde(alias = "max_html")]
     pub max_html_size: usize,
+
+    #[serde(alias = "max_xml")]
     pub max_xml_size: usize,
+
+    #[serde(alias = "max_media")]
     pub max_media_size: usize,
 
     /// Maximum number of images to include in an embed
@@ -47,8 +52,8 @@ pub struct Limits {
 impl Default for Limits {
     fn default() -> Self {
         Limits {
-            max_html_size: 1024 * 1024,
-            max_xml_size: 1024 * 1024,
+            max_html_size: 1024 * 1024, // 1 MiB
+            max_xml_size: 1024 * 1024,  // 1 MiB
             max_media_size: 1024 * 1024,
             max_images: 4,
         }
@@ -119,7 +124,10 @@ pub struct Site {
     pub domains: HashSet<String>,
     pub user_agent: Option<String>,
     pub cookie: Option<DeHeaderValue>,
+    pub fields: selectors::SiteFieldSelectors,
 }
+
+pub mod selectors;
 
 impl Site {
     pub fn matches(&self, domain: &str) -> bool {

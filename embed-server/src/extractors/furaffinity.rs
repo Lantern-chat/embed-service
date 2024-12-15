@@ -92,7 +92,7 @@ fn fix_relative_scheme(url: &str) -> Cow<str> {
 
 fn accumulate_text(el: ElementRef) -> String {
     el.text().fold(String::new(), |mut a, chunk| {
-        a += chunk;
+        a.push_str(chunk);
         a
     })
 }

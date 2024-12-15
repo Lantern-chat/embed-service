@@ -77,6 +77,11 @@ domains = [
     "ytkids.app.goo.gl",
 ]
 
+[sites.xkcd]
+color = 0x96A8C8
+domains = ["xkcd.com"]
+fields = { image_alt = "div#comic > img < title" }
+
 [sites.bluesky]
 color = 0x208bfe
 pattern = '''\.?bsky\.app$'''
