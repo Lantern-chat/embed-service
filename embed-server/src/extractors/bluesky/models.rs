@@ -343,7 +343,7 @@ pub fn apply_facets(text: ThinString, mut facets: Vec<BskyFacet>, flags: &mut Em
                     continue;
                 }
                 BskyFacetFeatures::Tag { tag } => {
-                    if !flags.contains(EmbedFlags::ADULT) && ADULT_TAGS.is_match(tag) {
+                    if !flags.contains(EmbedFlags::ADULT) && is_adult(tag) {
                         flags.insert(EmbedFlags::ADULT);
                     }
 
@@ -373,25 +373,30 @@ use aho_corasick::{AhoCorasick, AhoCorasickBuilder};
 // NOTE: These tag lists are on a best-effort basis and may not be exhaustive. Hopefully
 // bluesky's normal moderation ratings will catch most things to begin with.
 
-static ADULT_TAGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
-    AhoCorasickBuilder::new()
-        .ascii_case_insensitive(true)
-        .build([
-            "nsfw", "murr", "r34", "egirl", "eboy", "goon", "nudes", "hentai", "yiff", "porn", "abdl",
-            "bdsm", "vore", "fetish",
-        ])
-        .unwrap()
-});
+fn is_adult(tag: &str) -> bool {
+    static ADULT_TAGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+        AhoCorasickBuilder::new()
+            .ascii_case_insensitive(true)
+            .build([
+                "nsfw", "murr", "r34", "egirl", "eboy", "goon", "nudes", "hentai", "yiff", "porn", "abdl",
+                "bdsm", "vore", "fetish",
+            ])
+            .unwrap()
+    });
+
+    // Also avoiding the Scunthorpe problem
+    ADULT_TAGS.is_match(tag) || ["sex"].iter().any(|t| t.eq_ignore_ascii_case(tag))
+}
 
 fn is_graphic(tag: &str) -> bool {
+    static GRAPHIC_TAGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
+        AhoCorasickBuilder::new()
+            .ascii_case_insensitive(true)
+            .build(["shsky", "shtwt", "shbunny", "bodyhorror", "nsfl"])
+            .unwrap()
+    });
+
     // Gore/Guro may trigger the Scunthorpe problem when contained
     // in other tags, so we check for them separately in entirety.
     GRAPHIC_TAGS.is_match(tag) || ["gore", "guro"].iter().any(|t| t.eq_ignore_ascii_case(tag))
 }
-
-static GRAPHIC_TAGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
-    AhoCorasickBuilder::new()
-        .ascii_case_insensitive(true)
-        .build(["shsky", "shtwt", "shbunny", "bodyhorror"])
-        .unwrap()
-});
