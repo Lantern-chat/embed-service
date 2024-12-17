@@ -106,7 +106,7 @@ pub async fn extract_raw(
 
             let body = read_body(&mut resp, &mut html, max).await?;
 
-            std::fs::write("test.html", body).unwrap();
+            //std::fs::write("test.html", body).unwrap();
 
             if let Some(headers) = crate::parser::html::parse_meta(body) {
                 let extra = crate::parser::embed::parse_meta_to_embed(&mut embed, &headers);
@@ -115,6 +115,17 @@ pub async fn extract_raw(
                     Some(link) if oembed.is_none() => {
                         if let Ok(o) = fetch_oembed(&state, &link, url.domain()).await {
                             oembed = o;
+                        }
+                    }
+                    _ => {}
+                }
+
+                match extra.manifest {
+                    Some(manifest_url) if web_manifest::needs_manifest(&embed) => {
+                        if let Err(e) =
+                            web_manifest::try_fetch_manifest(&state, &manifest_url, &params, &mut embed).await
+                        {
+                            log::warn!("Failed to fetch manifest: {e}");
                         }
                     }
                     _ => {}

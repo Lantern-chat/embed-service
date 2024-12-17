@@ -4,13 +4,13 @@ use super::*;
 #[serde(default)]
 pub struct WebAppManifest {
     pub name: Option<SmolStr>,
-    pub name_localized: HashMap<SmolStr, LocalizedName>,
+    pub name_localized: HashMap<SmolStr, LocalizedValue<SmolStr>>,
 
     pub short_name: Option<SmolStr>,
-    pub short_name_localized: HashMap<SmolStr, LocalizedName>,
+    pub short_name_localized: HashMap<SmolStr, LocalizedValue<SmolStr>>,
 
     pub description: Option<ThinString>,
-    pub description_localized: HashMap<SmolStr, LocalizedDescription>,
+    pub description_localized: HashMap<SmolStr, LocalizedValue<ThinString>>,
 
     pub icons: Vec<ImageResource>,
 
@@ -18,18 +18,104 @@ pub struct WebAppManifest {
     pub background_color: Option<SmolStr>,
 }
 
-#[derive(Debug, serde::Deserialize)]
-pub struct LocalizedName {
-    pub value: SmolStr,
+fn get_localized<T>(
+    lang: Option<&str>,
+    generic: Option<T>,
+    localized: &HashMap<SmolStr, LocalizedValue<T>>,
+) -> Option<T>
+where
+    T: Clone,
+{
+    if let Some(lang) = lang {
+        if let Some(value) = localized.get(lang) {
+            return Some(value.value.clone());
+        }
+
+        if let Some((lang, _)) = lang.split_once('-') {
+            if let Some(value) = localized.get(lang) {
+                return Some(value.value.clone());
+            }
+        }
+    }
+
+    generic
 }
 
-#[derive(Debug, serde::Deserialize)]
-pub struct LocalizedDescription {
-    pub value: ThinString,
+impl WebAppManifest {
+    pub fn get_name(&mut self, lang: Option<&str>) -> Option<SmolStr> {
+        get_localized(lang, self.name.take(), &self.name_localized)
+    }
+
+    pub fn get_short_name(&mut self, lang: Option<&str>) -> Option<SmolStr> {
+        get_localized(lang, self.short_name.take(), &self.short_name_localized)
+    }
+
+    pub fn get_description(&mut self, lang: Option<&str>) -> Option<ThinString> {
+        get_localized(lang, self.description.take(), &self.description_localized)
+    }
+}
+
+#[derive(Debug)]
+pub struct LocalizedValue<T> {
+    pub value: T,
 }
 
 mod de_localized {
+    use super::LocalizedValue;
     use serde::de::{self, Deserialize, Deserializer};
+
+    impl<'de, T> Deserialize<'de> for LocalizedValue<T>
+    where
+        T: for<'a> From<&'a str>,
+        T: Deserialize<'de>,
+    {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            struct Visitor<T>(std::marker::PhantomData<T>);
+
+            impl<'de, T> de::Visitor<'de> for Visitor<T>
+            where
+                T: for<'a> From<&'a str>,
+                T: Deserialize<'de>,
+            {
+                type Value = LocalizedValue<T>;
+
+                fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                    write!(f, "a localized value or map containing a 'value' field")
+                }
+
+                fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+                where
+                    A: de::MapAccess<'de>,
+                {
+                    let mut value = None;
+
+                    while let Some(key) = map.next_key::<String>()? {
+                        if key == "value" {
+                            value = Some(map.next_value()?);
+                        } else {
+                            map.next_value::<serde::de::IgnoredAny>()?;
+                        }
+                    }
+
+                    Ok(LocalizedValue {
+                        value: value.ok_or_else(|| de::Error::missing_field("value"))?,
+                    })
+                }
+
+                fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                where
+                    E: de::Error,
+                {
+                    Ok(LocalizedValue { value: T::from(v) })
+                }
+            }
+
+            deserializer.deserialize_any(Visitor(std::marker::PhantomData))
+        }
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -46,6 +132,10 @@ pub struct ImageResource {
     pub purpose: Option<String>,
 }
 
+pub fn needs_manifest(embed: &EmbedV1) -> bool {
+    embed.provider.name.is_none() || embed.description.is_none() || embed.provider.icon.is_none()
+}
+
 pub async fn try_fetch_manifest(
     state: &ServiceState,
     manifest_url: &str,
@@ -60,23 +150,23 @@ pub async fn try_fetch_manifest(
 
     let mut manifest: WebAppManifest = resp.json().await?;
 
+    println!("{:?}", manifest);
+
+    let lang = params.lang.as_deref().unwrap_or("en");
+
+    if embed.description.is_none() {
+        embed.description = manifest.get_description(Some(lang));
+    }
+
+    if embed.provider.name.is_none() {
+        embed.provider.name = manifest.get_name(Some(lang)).or_else(|| manifest.get_short_name(Some(lang)));
+    }
+
     if embed.color.is_none() {
         embed.color = manifest
             .theme_color
             .or(manifest.background_color)
             .and_then(|c| crate::parser::embed::parse_color(&c))
-    }
-
-    if embed.description.is_none() {
-        match manifest.description_localized.get(params.lang.as_deref().unwrap_or("en")) {
-            Some(LocalizedDescription { value }) => embed.description = Some(value.as_str().into()),
-            None => embed.description = manifest.description,
-        }
-    }
-
-    // TODO: Use localized names
-    if embed.provider.name.is_none() {
-        embed.provider.name = manifest.name.or(manifest.short_name);
     }
 
     if embed.provider.icon.is_none() {
