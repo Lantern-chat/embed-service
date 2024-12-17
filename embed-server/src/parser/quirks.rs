@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use embed::*;
 
 use smol_str::ToSmolStr;
@@ -5,42 +7,48 @@ use url::Url;
 
 use super::StringHelpers;
 
+pub fn resolve_relative_url(base_url: &Url, mut old_url: &str) -> Result<Url, url::ParseError> {
+    Url::parse(&'url: {
+        // assume these are well-formed
+        if old_url.starts_with("https://") || old_url.starts_with("http://") {
+            break 'url Cow::Borrowed(old_url);
+        }
+
+        let mut url = base_url.origin().ascii_serialization();
+
+        if let Some(ou) = old_url.strip_prefix("./") {
+            if let Some((path, _)) = base_url.path().rsplit_once('/') {
+                url += path;
+            }
+
+            // if base_url as at the root, the above branch won't trigger, but we still
+            // need to strip the ./
+            old_url = ou;
+        }
+
+        // I've seen this before, where "https://" is replaced with "undefined//"
+        for prefix in ["undefined//", "//"] {
+            if let Some(old) = old_url.strip_prefix(prefix) {
+                base_url.scheme().clone_into(&mut url);
+
+                url += "//";
+                url += old;
+                break 'url Cow::Owned(url);
+            }
+        }
+
+        if !old_url.starts_with('/') {
+            url += "/";
+        }
+
+        url += old_url;
+        Cow::Owned(url)
+    })
+}
+
 pub fn resolve_relative(base_url: &Url, embed: &mut EmbedV1) {
     embed.visit_media(|media| {
-        // assume these are well-formed
-        if media.url.starts_with("https://") || media.url.starts_with("http://") {
-            return;
-        }
-
-        if media.url.starts_with('.') {
-            // TODO
-        }
-
-        let old = media.url.as_str();
-
-        let new_url = Url::parse(&'media_url: {
-            let mut url = base_url.origin().ascii_serialization();
-
-            // I've seen this before, where "https://" is replaced with "undefined//"
-            for prefix in ["undefined//", "//"] {
-                if let Some(old) = old.strip_prefix(prefix) {
-                    base_url.scheme().clone_into(&mut url);
-
-                    url += "//";
-                    url += old;
-                    break 'media_url url;
-                }
-            }
-
-            if !old.starts_with('/') {
-                url += "/";
-            }
-
-            url += old;
-            url
-        });
-
-        media.url = match new_url {
+        media.url = match resolve_relative_url(base_url, &media.url) {
             Ok(url) => url.as_str().into(),
             Err(_) => Default::default(),
         };
@@ -157,4 +165,51 @@ pub fn fix_embed(embed: &mut EmbedV1) {
     }
 
     super::embed::determine_embed_type(embed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{resolve_relative_url, Url};
+
+    #[test]
+    fn test_resolve_relative_url() {
+        let base = Url::parse("https://example.com/test/page.php").unwrap();
+
+        assert_eq!(
+            resolve_relative_url(&base, "https://example.com/test/page.php"),
+            Ok(Url::parse("https://example.com/test/page.php").unwrap())
+        );
+
+        assert_eq!(
+            resolve_relative_url(&base, "test/page.php"),
+            Ok(Url::parse("https://example.com/test/page.php").unwrap())
+        );
+
+        assert_eq!(
+            resolve_relative_url(&base, "/test/page.php"),
+            Ok(Url::parse("https://example.com/test/page.php").unwrap())
+        );
+
+        assert_eq!(
+            resolve_relative_url(&base, "page.php"),
+            Ok(Url::parse("https://example.com/page.php").unwrap())
+        );
+
+        assert_eq!(
+            resolve_relative_url(&base, "./page.php"),
+            Ok(Url::parse("https://example.com/test/page.php").unwrap())
+        );
+
+        assert_eq!(
+            resolve_relative_url(&base, "./test/page.php"),
+            Ok(Url::parse("https://example.com/test/test/page.php").unwrap())
+        );
+
+        let base = Url::parse("https://example.com/test/").unwrap();
+
+        assert_eq!(
+            resolve_relative_url(&base, "./page.php"),
+            Ok(Url::parse("https://example.com/test/page.php").unwrap())
+        );
+    }
 }
