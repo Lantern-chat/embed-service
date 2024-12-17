@@ -138,19 +138,23 @@ pub fn needs_manifest(embed: &EmbedV1) -> bool {
 
 pub async fn try_fetch_manifest(
     state: &ServiceState,
+    base_url: &Url,
     manifest_url: &str,
     params: &Params,
     embed: &mut EmbedV1,
 ) -> Result<(), Error> {
-    let mut resp = retry_request(2, || state.client.get(manifest_url)).await?;
+    // if the path can't be resolved, don't bother fetching
+    let Ok(manifest_url) = crate::parser::quirks::resolve_relative_url(base_url, manifest_url) else {
+        return Ok(());
+    };
+
+    let mut resp = state.client.get(manifest_url).send().await?;
 
     if !resp.status().is_success() {
         return Err(Error::Failure(resp.status()));
     }
 
     let mut manifest: WebAppManifest = resp.json().await?;
-
-    println!("{:?}", manifest);
 
     let lang = params.lang.as_deref().unwrap_or("en");
 

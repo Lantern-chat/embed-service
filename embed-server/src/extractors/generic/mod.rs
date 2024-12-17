@@ -123,7 +123,8 @@ pub async fn extract_raw(
                 match extra.manifest {
                     Some(manifest_url) if web_manifest::needs_manifest(&embed) => {
                         if let Err(e) =
-                            web_manifest::try_fetch_manifest(&state, &manifest_url, &params, &mut embed).await
+                            web_manifest::try_fetch_manifest(&state, &url, &manifest_url, &params, &mut embed)
+                                .await
                         {
                             log::warn!("Failed to fetch manifest: {e}");
                         }
