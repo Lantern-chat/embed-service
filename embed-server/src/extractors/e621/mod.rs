@@ -154,7 +154,7 @@ async fn fetch_single_id(
     let mut main_embed =
         Box::<EmbedMedia>::default().with_url(file_url).with_dims(file.width as _, file.height as _);
 
-    if let Some(ext) = main_embed.url.split('.').last() {
+    if let Some((_, ext)) = main_embed.url.rsplit_once('.') {
         let mime = mime_guess::from_ext(ext).first();
 
         main_embed.mime = mime.as_ref().map(|m| m.to_smolstr());
@@ -220,8 +220,9 @@ async fn fetch_single_id(
         alt_media.width = Some(alt.width as _);
         alt_media.height = Some(alt.height as _);
 
-        alt_media.mime =
-            url.split('.').last().and_then(|ext| Some(mime_guess::from_ext(ext).first()?.to_smolstr()));
+        if let Some((_, ext)) = url.rsplit_once('.') {
+            alt_media.mime = mime_guess::from_ext(ext).first().map(|ext| ext.to_smolstr());
+        }
 
         video.alts.push(alt_media);
     }

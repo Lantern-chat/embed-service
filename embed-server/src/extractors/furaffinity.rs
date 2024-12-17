@@ -61,19 +61,43 @@ impl Extractor for FurAffinityExtractor {
         url: Url,
         params: Params,
     ) -> Result<EmbedWithExpire, Error> {
-        let html = state
+        let resp = state
             .client
             .get(url.clone())
             .header(HeaderName::from_static("cookie"), &self.cookie)
             .header(HeaderName::from_static("user-agent"), &self.user_agent)
             .send()
-            .await?
-            .text()
             .await?;
 
-        let mut embed = parse_html(&html, &url)?;
+        if !resp.status().is_success() {
+            return Err(Error::Failure(resp.status()));
+        }
 
-        generic::resolve_images(&state, &None, &mut embed).await?;
+        let html = resp.text().await?;
+
+        let ParsedResult {
+            mut embed,
+            needs_media_resolved,
+        } = parse_html(&html, &url)?;
+
+        if needs_media_resolved {
+            generic::resolve_media::resolve_images(&state, &None, &mut embed).await?;
+        }
+
+        static FA_PROVIDER: LazyLock<EmbedProvider> = LazyLock::new(|| {
+            let mut provider = EmbedProvider::default();
+
+            provider.name = Some(SmolStr::new_inline("FurAffinity"));
+            provider.url = Some(ThinString::from("https://www.furaffinity.net"));
+            provider.icon = Some(
+                Box::<EmbedMedia>::default()
+                    .with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"),
+            );
+
+            provider
+        });
+
+        embed.provider = FA_PROVIDER.clone();
 
         Ok(generic::finalize_embed(state, embed, Some(60 * 60 * 4)))
     }
@@ -97,8 +121,12 @@ fn accumulate_text(el: ElementRef) -> String {
     })
 }
 
-#[instrument(skip_all)]
-fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
+struct ParsedResult {
+    embed: EmbedV1,
+    needs_media_resolved: bool,
+}
+
+fn parse_html(html: &str, url: &Url) -> Result<ParsedResult, Error> {
     let doc = scraper::Html::parse_document(html);
 
     let mut embed = EmbedV1::default();
@@ -110,6 +138,8 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
         Audio,
         Unsupported,
     }
+
+    let mut needs_media_resolved = false;
 
     // find submission and parse media nodes
     if let Some(node) = doc.select(selector!("div.submission-area")).next() {
@@ -131,6 +161,7 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
                 src = el.attr("src");
                 alt = el.attr("alt");
+
                 break;
             }
         }
@@ -139,16 +170,48 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
             Some(src) if kind != Kind::Unsupported => {
                 let use_thumbnail = node.value().has_class("submission-writing", AsciiCaseInsensitive);
 
-                let mut media = Box::<EmbedMedia>::default().with_url(fix_relative_scheme(src));
+                let mut media = Box::<EmbedMedia>::default().with_url(fix_relative_scheme(src)).guess_mime();
 
                 media.description = alt.map(ThinString::from);
+
+                if matches!(kind, Kind::Image | Kind::Video) {
+                    'highlights: for info_node in doc.select(selector!("div.info > div > strong.highlight")) {
+                        if !matches!(info_node.text().next(), Some(txt) if txt.eq_ignore_ascii_case("size")) {
+                            continue;
+                        }
+
+                        // for each sibling node, try to find the size text and parse it
+                        for sibling in info_node.next_siblings() {
+                            // only care about span elements
+                            let el = match ElementRef::wrap(sibling) {
+                                Some(el) if el.value().name() == "span" => el,
+                                _ => continue,
+                            };
+
+                            // the span node should contain the size in the format "WIDTH x HEIGHTpx"
+                            if let Some((width, height)) = el
+                                .text()
+                                .next()
+                                .and_then(|size_text| size_text.trim_end_matches("px").split_once('x'))
+                            {
+                                media.width = width.trim().parse().ok();
+                                media.height = height.trim().parse().ok();
+                                break 'highlights;
+                            }
+                        }
+                    }
+                }
+
+                if media.mime.is_none() || media.width.is_none() || media.height.is_none() {
+                    needs_media_resolved = true;
+                }
 
                 match kind {
                     Kind::Image if use_thumbnail => embed.thumb = Some(media),
                     Kind::Image => embed.imgs.push(*media),
                     Kind::Video => embed.video = Some(media),
                     Kind::Audio => embed.audio = Some(media),
-                    _ => {}
+                    Kind::Unsupported => unreachable!(),
                 }
             }
             _ => {}
@@ -212,7 +275,7 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
     if let Some(node) = doc.select(selector!("img.submission-user-icon")).next() {
         if let Some(src) = node.value().attr("src") {
-            author.icon = Some(Box::<EmbedMedia>::default().with_url(fix_relative_scheme(src)));
+            author.icon = Some(Box::<EmbedMedia>::default().with_url(fix_relative_scheme(src)).guess_mime());
         }
     }
 
@@ -269,19 +332,8 @@ fn parse_html(html: &str, url: &Url) -> Result<EmbedV1, Error> {
 
     embed.color = Some(0xadd8f5);
 
-    static FA_PROVIDER: LazyLock<EmbedProvider> = LazyLock::new(|| {
-        let mut provider = EmbedProvider::default();
-
-        provider.name = Some(SmolStr::new_inline("FurAffinity"));
-        provider.url = Some(ThinString::from("https://www.furaffinity.net"));
-        provider.icon = Some(
-            Box::<EmbedMedia>::default().with_url("https://www.furaffinity.net/themes/beta/img/favicon.ico"),
-        );
-
-        provider
-    });
-
-    embed.provider = FA_PROVIDER.clone();
-
-    Ok(embed)
+    Ok(ParsedResult {
+        embed,
+        needs_media_resolved,
+    })
 }

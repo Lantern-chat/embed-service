@@ -1,5 +1,6 @@
 use embed::*;
 
+use smol_str::ToSmolStr;
 use url::Url;
 
 use super::StringHelpers;
@@ -139,6 +140,12 @@ pub fn fix_embed(embed: &mut EmbedV1) {
 
     embed.visit_media(|media| {
         media.description.trim_text(512);
+
+        if media.mime.is_none() {
+            if let Some((_, ext)) = media.url.rsplit_once('.') {
+                media.mime = mime_guess::from_ext(ext).first().map(|m| m.to_smolstr());
+            }
+        }
     });
 
     embed.title.trim_text(1024);

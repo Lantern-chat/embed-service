@@ -18,7 +18,7 @@ json-simd = ["sonic_json"]
 # cache_pg = ["cache", "tokio-postgres"]
 
 [dependencies]
-embed = { package = "embed-sdk", path = "../embed-sdk" }
+embed = { package = "embed-sdk", path = "../embed-sdk", features = ["mime_guess"] }
 
 ftl = { git = "https://github.com/Lantern-chat/ftl2", default-features = false, features = ["json"] }
 
