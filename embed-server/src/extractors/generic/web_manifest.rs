@@ -61,7 +61,10 @@ pub async fn try_fetch_manifest(
     let mut manifest: WebAppManifest = resp.json().await?;
 
     if embed.color.is_none() {
-        embed.color = manifest.theme_color.or(manifest.background_color).and_then(|c| c.parse().ok());
+        embed.color = manifest
+            .theme_color
+            .or(manifest.background_color)
+            .and_then(|c| crate::parser::embed::parse_color(&c))
     }
 
     if embed.description.is_none() {

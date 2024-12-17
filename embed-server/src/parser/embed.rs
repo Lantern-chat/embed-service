@@ -13,17 +13,12 @@ pub struct ExtraFields<'a> {
     pub manifest: Option<String>,
 }
 
-fn parse_color(color: &str) -> Option<u32> {
+pub fn parse_color(color: &str) -> Option<u32> {
     match csscolorparser::parse(color) {
         Err(_) => None,
         Ok(color) => Some(u32::from_le_bytes({
-            let mut bytes = color.to_rgba8();
-            // rgba -> bgr0
-            bytes[3] = bytes[0]; // r -> a
-            bytes[0] = bytes[2]; // b -> r
-            bytes[2] = bytes[3]; // a -> b
-            bytes[3] = 0; // 0 -> a
-            bytes
+            let [r, g, b, _] = color.to_rgba8();
+            [b, g, r, 0]
         })),
     }
 }
@@ -501,5 +496,16 @@ mod tests {
             ty.as_ref().map::<&str, _>(|s| s),
             Some("application/x-shockwave-flash")
         );
+    }
+
+    #[test]
+    fn test_parse_color() {
+        let colors = [
+            0x00ff00, 0xff0000, 0x0000ff, 0x000000, 0xffffff, 0x123456, 0xabcdef,
+        ];
+
+        for color in colors {
+            assert_eq!(parse_color(&format!("#{color:06x}")), Some(color));
+        }
     }
 }
