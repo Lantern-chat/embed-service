@@ -141,6 +141,33 @@ domains = [
     "status.discord.com",
 ]
 
+# https://gist.github.com/AminulBD/8c347539ecd49a8ab0b24544dd2ebab1
+[sites.amazon]
+color = 0xFF9900
+user_agent = "%browser"
+domains = [
+    "amazon.com",
+    "amazon.co.uk",
+    "amazon.ca",
+    "amazon.de",
+    "amazon.es",
+    "amazon.fr",
+    "amazon.it",
+    "amazon.co.jp",
+    "amazon.in",
+    "amazon.cn",
+    "amazon.com.sg",
+    "amazon.com.mx",
+    "amazon.ae",
+    "amazon.com.br",
+    "amazon.nl",
+    "amazon.com.au",
+    "amazon.com.tr",
+    "amazon.sa",
+    "amazon.se",
+    "amazon.pl",
+]
+
 [sites.giphy]
 color = 0x9933FF
 pattern = '''giphy\.com$'''
