@@ -6,7 +6,7 @@ license = "MIT OR Apache 2.0"
 
 [dependencies.client-sdk]
 git = "https://github.com/Lantern-chat/client-sdk-rs"
-default_features = false
+default-features = false
 features = []
 
 [dependencies]
