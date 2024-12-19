@@ -87,12 +87,12 @@ pub use super::regexes::{ATTRIBUTE_RE, META_TAGS};
 
 /// Returns `None` on invalid HTML
 pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
-    let bytes = input.as_bytes();
-
     let mut res = HeaderList::<'a>::default();
     let mut scope = None;
 
-    for (mut start, mut tag_end) in META_TAGS.find_iter(bytes) {
+    for m in META_TAGS.find_iter(input) {
+        let (mut start, mut tag_end) = (m.start(), m.end());
+
         // detect tag type and initialize header value
         let mut header = match input.get(start..tag_end) {
             Some("<meta ") => Header::Meta(Meta {
@@ -105,7 +105,7 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
             Some(tag) if tag.starts_with("<title") => {
                 let title_start = tag_end;
 
-                if let Some(title_end) = memchr::memmem::find(&bytes[title_start..], b"</title>") {
+                if let Some(title_end) = memchr::memmem::find(input[title_start..].as_bytes(), b"</title>") {
                     res.push(Header::Meta(Meta {
                         content: input[title_start..(title_start + title_end)].trim().into(),
                         pty: MetaProperty::Title,
@@ -142,15 +142,15 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
         start = tag_end; // skip to end of opening tag
 
         // find end of tag, like <meta whatever="" >
-        let end = match memchr::memchr(b'>', &bytes[start..]) {
+        let end = match memchr::memchr(b'>', input[start..].as_bytes()) {
             Some(end) => end + start,
             None => continue,
         };
         let meta_inner = &input[start..end];
 
         // name="" content=""
-        for (m0, m1) in ATTRIBUTE_RE.find_iter(meta_inner.as_bytes()) {
-            let part = &meta_inner[m0..m1];
+        for m in ATTRIBUTE_RE.find_iter(meta_inner) {
+            let part = m.as_str();
 
             // name=""
             if let Some((left, right)) = part.split_once('=') {
@@ -252,17 +252,4 @@ pub fn parse_meta<'a>(input: &'a str) -> Option<HeaderList<'a>> {
     //res.sort();
 
     Some(res)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_attribute_regex_size() {
-        println!(
-            "{}",
-            ATTRIBUTE_RE.forward().memory_usage() + ATTRIBUTE_RE.reverse().memory_usage()
-        );
-    }
 }

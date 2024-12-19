@@ -11,10 +11,29 @@ fn trim_quotes(s: &str) -> &str {
     s.trim_matches(|c: char| ['"', '\'', '“', '”'].contains(&c) || c.is_whitespace())
 }
 
+#[rustfmt::skip]
 pub mod regexes {
-    use regex_automata::{DenseDFA, Regex};
+    use regex::Regex;
+    use std::sync::LazyLock;
 
-    include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
+    pub static ATTRIBUTE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"(?x)
+            [a-zA-Z_][0-9a-zA-Z\-_]+\s*=\s*(
+            ("(?:\\"|[^"])*[^\\]")| # name="value"
+            ('(?:\\'|[^'])*[^\\]')| # name='value'
+            ([^'"](?:\\\s|[^\s>]*)) # name=value or name=value>
+        )"#).unwrap()
+    });
+
+    pub static META_TAGS: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?x)
+            <(?i)( # NOTE: Tags are case-insensitive
+            meta\x20|                   # Regular meta tags
+            title[^>]*>|                # <title> element, skipping over attributes
+            link\x20|                   # link elements
+            ((div|span)[^>]+itemscope)  # itemscopes
+        )").unwrap()
+    });
 }
 
 /// We can't embed infinite text, so this attempts to trim it below `max_len` without abrubtly

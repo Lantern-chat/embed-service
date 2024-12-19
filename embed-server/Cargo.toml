@@ -27,7 +27,7 @@ reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-
+aho-corasick = "1.1.3"
 bytes = "1"
 hashbrown = { version = "0.15", features = ["inline-more", "serde"] }
 imagesize = "0.13.0"
@@ -54,7 +54,6 @@ arc-swap = "1.7.0"
 scraper = { version = "0.22", default-features = false }
 ego-tree = "0.10"
 serde_repr = "0.1.7"
-regex-automata = { version = "0.1.10", default-features = false }
 smallvec = "1.7.0"
 csscolorparser = { version = "0.7", default-features = false, features = ["named-colors"] }
 html-escape = { version = "0.2.13", default-features = false }
@@ -75,8 +74,3 @@ redb = { version = "2.0", optional = true }
 
 
 # redis = { version = "0.25.3", optional = true, features = ["tokio-comp", "ahash", "connection-manager"] }
-
-aho-corasick = "1.1.3"
-regex-build = { git = "https://github.com/Lantern-chat/regex-build" }
-[build-dependencies]
-regex-build = { git = "https://github.com/Lantern-chat/regex-build", features = ["build"] }
