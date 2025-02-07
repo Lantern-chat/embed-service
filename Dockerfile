@@ -1,8 +1,10 @@
 FROM messense/rust-musl-cross:x86_64-musl AS build
 COPY ./ /home/rust/src
+
 # Uncomment if building behind proxy with a custom CA certificate.
 #COPY cacert.gitignore.crt /usr/local/share/ca-certificates/proxyca.crt
 #RUN update-ca-certificates
+
 RUN --mount=type=cache,target=/home/rust/src/target \
     --mount=type=cache,target=/root/.cargo/registry \
     --mount=type=cache,target=/root/.cargo/git \
@@ -12,7 +14,12 @@ RUN --mount=type=cache,target=/home/rust/src/target \
 FROM scratch
 USER 1001:1001
 COPY --from=build /embed-server /embed-server
-COPY ./embed-server/config.prod.toml /config.toml
+COPY ./docker/config.default.toml /config/config.toml
+
+ENV EMBED_CONFIG_PATH="/config/config.toml"
 ENV EMBED_BIND_ADDRESS="0.0.0.0:8050"
+# ENV CAMO_SIGNING_KEY=""
 EXPOSE 8050/tcp
+
+VOLUME ["/config"]
 ENTRYPOINT ["/embed-server"]

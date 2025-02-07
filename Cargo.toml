@@ -7,3 +7,8 @@ postgres-types = { git = "https://github.com/Lantern-chat/rust-postgres" }
 schemars = { git = "https://github.com/Lantern-chat/schemars" }
 # rkyv = { git = "https://github.com/rkyv/rkyv" }
 
+[profile.release]
+codegen-units = 1
+strip = true
+opt-level = "s"
+lto = "fat"
