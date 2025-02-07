@@ -10,7 +10,7 @@ default = ["json-simd", "cache_redis", "cache_rusqlite", "cache_redb"]
 cache_redis = ["fred"]
 cache_rusqlite = ["r2d2_sqlite", "r2d2", "blake3"]
 cache_redb = ["redb"]
-cache_pg = ["tokio-postgres", "deadpool-postgres"]
+#cache_pg = ["tokio-postgres", "deadpool-postgres"]
 
 sonic_json = ["sonic-rs", "ftl/json-simd"]
 json-simd = ["sonic_json"]
