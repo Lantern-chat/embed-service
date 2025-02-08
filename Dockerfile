@@ -12,6 +12,12 @@ RUN --mount=type=cache,target=/home/rust/src/target \
     mv /home/rust/src/target/x86_64-unknown-linux-musl/release/embed-server /embed-server
 
 FROM scratch
+
+LABEL org.opencontainers.image.title="embed-service" \
+      org.opencontainers.image.description="Microservice to generate embed previews from website URLs" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.source="https://github.com/Lantern-chat/embed-service"
+
 USER 1001:1001
 COPY --from=build /embed-server /embed-server
 COPY ./docker/config.default.toml /config/config.toml
@@ -21,5 +27,4 @@ ENV EMBED_BIND_ADDRESS="0.0.0.0:8050"
 # ENV CAMO_SIGNING_KEY=""
 EXPOSE 8050/tcp
 
-VOLUME ["/config"]
 ENTRYPOINT ["/embed-server"]
